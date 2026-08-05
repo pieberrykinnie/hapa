@@ -4,7 +4,7 @@ One versioned `hapa.onboarding.v1` JSON document contains:
 
 | Field | Meaning |
 |---|---|
-| `version` | Storage schema version (`1`) |
+| `version` | Storage schema version (`2`) |
 | `stage` | `profile`, `this_you`, `billing`, or `complete` |
 | `displayName` | Required trimmed name |
 | `photos` | Up to five compressed local images with per-image visual features and allow-listed filename keywords |
