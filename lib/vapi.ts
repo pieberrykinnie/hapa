@@ -1,5 +1,5 @@
 import Vapi from "@vapi-ai/web";
-import type { CreateAssistantDTO } from "@vapi-ai/web/dist/api";
+import type { ChunkPlan, CreateAssistantDTO } from "@vapi-ai/web/dist/api";
 import type { VibeShift } from "./types";
 
 /** Name of the client-side tool the assistant calls to redirect the feed. */
@@ -102,7 +102,18 @@ export const HAPA_ASSISTANT_CONFIG: CreateAssistantDTO = {
   },
   voice: {
     provider: "vapi",
-    voiceId: "Elliot",
+    voiceId: "Savannah",
+    // Default chunking (30 chars, wide punctuation boundaries) sends short
+    // fragments to the voice provider and can produce audible seams between
+    // synthesized chunks. Larger, sentence-bounded chunks trade a little
+    // latency for materially cleaner playback. https://docs.vapi.ai — ChunkPlan.
+    chunkPlan: {
+      minCharacters: 80,
+      // The generated type only allows a single value here — a known
+      // swagger-typescript-api generation quirk (the SDK's own JSDoc
+      // @example shows an array). The API accepts an array at runtime.
+      punctuationBoundaries: [".", "!", "?"] as unknown as ChunkPlan["punctuationBoundaries"],
+    },
   },
 };
 

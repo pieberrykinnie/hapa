@@ -95,6 +95,8 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
   const [textInput, setTextInput] = useState("");
   const closedRef = useRef(false);
   const connectedRef = useRef(false);
+  const speakingRef = useRef(false);
+  const pendingHangupRef = useRef(false);
 
   const handleShift = useCallback(
     (shift: VibeShift) => {
@@ -113,8 +115,24 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
       connectedRef.current = true;
       setCallState("listening");
     };
-    const handleSpeechStart = () => !cancelled && setCallState("speaking");
-    const handleSpeechEnd = () => !cancelled && setCallState("listening");
+    const handleSpeechStart = () => {
+      if (cancelled) return;
+      speakingRef.current = true;
+      setCallState("speaking");
+    };
+    const handleSpeechEnd = () => {
+      if (cancelled) return;
+      speakingRef.current = false;
+      // The vibe shift landed while hapa was still talking — let her finish
+      // that line, then hang up instead of sitting there listening again.
+      if (pendingHangupRef.current) {
+        pendingHangupRef.current = false;
+        closedRef.current = true;
+        onClose();
+        return;
+      }
+      setCallState("listening");
+    };
     const handleCallEnd = () => {
       if (cancelled) return;
       // A call that ends before it ever connected (e.g. mic permission
@@ -145,7 +163,16 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
           if (call.function?.name !== SHIFT_FEED_VIBE_TOOL) continue;
           try {
             const shift = toVibeShift(JSON.parse(call.function.arguments));
-            if (shift) handleShift(shift);
+            if (!shift) continue;
+            handleShift(shift);
+            // One shift per call: stop listening once hapa's done confirming
+            // it, rather than sitting open for more input.
+            if (speakingRef.current) {
+              pendingHangupRef.current = true;
+            } else {
+              closedRef.current = true;
+              onClose();
+            }
           } catch {
             // malformed tool-call arguments — ignore, assistant may retry
           }
