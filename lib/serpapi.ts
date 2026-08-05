@@ -51,12 +51,24 @@ interface SerpApiImmersiveProductResponse {
 }
 
 /**
+ * `dna.likes` appends new signals at the end (see `applyVibeShift` in
+ * hapa-provider.tsx) — the shopper's most recent request, e.g. what they
+ * just said by voice, is the *tail* of the array, not the head. Taking the
+ * last N and reversing them prepends the newest term to the front of the
+ * built query string, so it leads the search instead of trailing behind
+ * older, less relevant likes.
+ */
+function mostRecent(keywords: string[], n: number): string[] {
+  return keywords.slice(-n).reverse();
+}
+
+/**
  * Builds a Google Shopping query from a set of keywords. Positive keywords
  * lead; dealbreakers are appended as `-term` exclusions so SerpApi itself
  * filters obvious mismatches before they ever reach the client.
  */
 function buildQuery(keywords: string[], exclude: string[]): string {
-  const positive = keywords.slice(0, 3).join(" ");
+  const positive = mostRecent(keywords, 3).join(" ");
   const negative = exclude.map((term) => `-${term}`).join(" ");
   const query = [positive, negative].filter(Boolean).join(" ").trim();
   return query.slice(0, MAX_QUERY_LENGTH);
@@ -87,7 +99,7 @@ function buildQueryVariants(keywords: string[], exclude: string[]): string[] {
   };
 
   add(keywords);
-  keywords.slice(0, 3).forEach((keyword) => add([keyword]));
+  mostRecent(keywords, 3).forEach((keyword) => add([keyword]));
   relatedTags(keywords, exclude).forEach((tag) => add([tag]));
 
   return variants;

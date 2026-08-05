@@ -137,6 +137,20 @@ input:focus-visible {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
+/* loading spinner — reserved for spots the skeleton pulse can't cover, like
+   the tail of an infinite-scroll list where the existing cards must stay put */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinner {
+  border: 2.5px solid var(--color-line);
+  border-top-color: var(--color-pine);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
 /* voice waveform */
 @keyframes wave {
   0%,
