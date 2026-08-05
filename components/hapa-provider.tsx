@@ -40,6 +40,15 @@ const BILLING_LABELS: Record<BillingProvider, string> = {
 
 export type Screen = "identity" | "swipe" | "billing" | "building" | "feed";
 
+interface FetchFeedOpts {
+  dna: StyleDNA;
+  category: string;
+  cursor: number;
+  replace: boolean;
+  isRetry?: boolean;
+  restoreOnFailure?: Product[];
+}
+
 interface HapaContextValue {
   screen: Screen;
   dna: StyleDNA;
@@ -123,30 +132,65 @@ export function HapaProvider({
   const fetchIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const agentTimersRef = useRef<number[]>([]);
+  const itemsRef = useRef<Product[]>([]);
+  // Every product ID shown so far in the current feed "lap" — sent back with
+  // each request so neither live discovery nor the fallback loop repeats an
+  // item before the shopper has seen everything eligible once. Reset inside
+  // fetchFeed whenever a request replaces the feed (a fresh lap).
+  const seenRef = useRef<Set<string>>(new Set());
+  // Self-reference for the retry below: a `useCallback` can't call its own
+  // binding inside its initializer, so the retry reads the latest version
+  // through this ref instead (kept in sync by the effect right after it).
+  const fetchFeedRef = useRef<(opts: FetchFeedOpts) => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const fetchFeed = useCallback(
-    async (opts: {
-      dna: StyleDNA;
-      category: string;
-      cursor: number;
-      replace: boolean;
-    }) => {
+    async (opts: FetchFeedOpts) => {
       const fetchId = ++fetchIdRef.current;
+      // A replace starts a fresh lap through the catalogue/live results.
+      if (opts.replace) seenRef.current = new Set();
       const keywords =
         opts.category === "for-you" ? opts.dna.likes : [opts.category];
+      const seenList = Array.from(seenRef.current).slice(-120);
       const params = new URLSearchParams({
         keywords: keywords.join(","),
         exclude: opts.dna.dealbreakers.join(","),
         cursor: String(opts.cursor),
+        seen: seenList.join(","),
       });
       try {
         const res = await fetch(`/api/feed?${params}`);
+        if (!res.ok) throw new Error(`feed request failed: ${res.status}`);
         const data = (await res.json()) as FeedResponse;
-        if (fetchId !== fetchIdRef.current) return; // stale response
+        if (fetchId !== fetchIdRef.current) return; // superseded by a newer request
         cursorRef.current = data.nextCursor;
-        setItems((prev) => (opts.replace ? data.items : [...prev, ...data.items]));
+        data.items.forEach((item) => seenRef.current.add(item.id));
+        setItems((prev) => {
+          if (!opts.replace) return [...prev, ...data.items];
+          // The feed never renders empty: an empty/failed refresh keeps
+          // whatever was already showing instead of blanking the screen.
+          return data.items.length > 0 ? data.items : prev;
+        });
       } catch {
         if (fetchId !== fetchIdRef.current) return;
+        if (!opts.isRetry) {
+          // one silent retry after 1.5s before giving up on this request
+          const retryTimer = window.setTimeout(() => {
+            if (fetchId === fetchIdRef.current) {
+              fetchFeedRef.current({ ...opts, isRetry: true });
+            }
+          }, 1500);
+          agentTimersRef.current.push(retryTimer);
+          return;
+        }
+        if (opts.restoreOnFailure && opts.restoreOnFailure.length > 0) {
+          setItems(opts.restoreOnFailure);
+          // keep the restored items out of the next lap too
+          opts.restoreOnFailure.forEach((item) => seenRef.current.add(item.id));
+        }
       } finally {
         if (!opts.replace) loadingMoreRef.current = false;
         if (fetchId === fetchIdRef.current) setStatus("idle");
@@ -155,8 +199,12 @@ export function HapaProvider({
     [],
   );
 
-  // Authenticated profile/style state is supplied by the server. Only saved
-  // product presentation state remains a non-authoritative local convenience.
+  useEffect(() => {
+    fetchFeedRef.current = fetchFeed;
+  }, [fetchFeed]);
+
+  // Profile/style state comes from the device-local onboarding coordinator.
+  // Saved product presentation state remains a local convenience.
   useEffect(() => {
     const storedSaved = loadJSON<Product[]>(SAVED_STORAGE_KEY);
     /* Hydrating persisted state is exactly the "sync from an external system"
@@ -212,11 +260,17 @@ export function HapaProvider({
   const finishIdentity = useCallback(() => setScreen("swipe"), []);
 
   const swipe = useCallback(
-    (tags: string[], liked: boolean, isLast: boolean) => {
+    (rawTags: string[], liked: boolean, isLast: boolean) => {
+      const tags = normalizeTags(rawTags);
       setDNA((prev) => {
         const next: StyleDNA = liked
           ? { ...prev, likes: dedupe([...prev.likes, ...tags]) }
-          : { ...prev, dealbreakers: dedupe([...prev.dealbreakers, ...tags]) };
+          : {
+              ...prev,
+              // an exclusion always wins over an existing positive preference — FR-012
+              likes: prev.likes.filter((t) => !tags.includes(t)),
+              dealbreakers: dedupe([...prev.dealbreakers, ...tags]),
+            };
         saveJSON(DNA_STORAGE_KEY, next);
         // billing is the last onboarding beat, then straight into the feed
         if (isLast) setScreen("billing");
@@ -265,8 +319,9 @@ export function HapaProvider({
       // fetched items are kept so switching back doesn't reload the feed.
       if (category === "saved") return;
       setStatus("loading");
+      const restoreOnFailure = itemsRef.current;
       setItems([]);
-      fetchFeed({ dna, category, cursor: 0, replace: true });
+      fetchFeed({ dna, category, cursor: 0, replace: true, restoreOnFailure });
     },
     [dna, fetchFeed],
   );
@@ -303,12 +358,22 @@ export function HapaProvider({
   // Voice tool handler: merge deltas into StyleDNA, build plain-language toast,
   // flush the feed and refetch. A decisive reset, not a reshuffle.
   const applyVibeShift = useCallback(
-    (shift: VibeShift) => {
+    (rawShift: VibeShift) => {
+      const shift: VibeShift = {
+        add_keywords: normalizeTags(rawShift.add_keywords),
+        remove_keywords: normalizeTags(rawShift.remove_keywords),
+        dealbreakers: normalizeTags(rawShift.dealbreakers),
+      };
       setDNA((prev) => {
         const next: StyleDNA = {
           ...prev,
           likes: dedupe([
-            ...prev.likes.filter((t) => !shift.remove_keywords.includes(t)),
+            ...prev.likes.filter(
+              (t) =>
+                !shift.remove_keywords.includes(t) &&
+                // an exclusion always wins over an existing positive preference — FR-012
+                !shift.dealbreakers.includes(t),
+            ),
             ...shift.add_keywords,
           ]),
           dealbreakers: dedupe([...prev.dealbreakers, ...shift.dealbreakers]),
@@ -323,8 +388,15 @@ export function HapaProvider({
         setToast(`Updating your feed: more ${more} · less ${less}`);
         setActiveCategory("for-you");
         setStatus("shifting");
+        const restoreOnFailure = itemsRef.current;
         setItems([]);
-        fetchFeed({ dna: next, category: "for-you", cursor: 0, replace: true });
+        fetchFeed({
+          dna: next,
+          category: "for-you",
+          cursor: 0,
+          replace: true,
+          restoreOnFailure,
+        });
         return next;
       });
     },
@@ -457,4 +529,10 @@ export function HapaProvider({
 
 function dedupe(list: string[]): string[] {
   return Array.from(new Set(list));
+}
+
+// Casing/whitespace-insensitive so "Camping" and "camping " collapse to one
+// preference or exclusion instead of silently duplicating it.
+function normalizeTags(tags: string[]): string[] {
+  return dedupe(tags.map((t) => t.trim().toLowerCase()).filter(Boolean));
 }

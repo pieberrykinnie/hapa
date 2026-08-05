@@ -7,7 +7,14 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Your feed, your vibe. An AI DJ for shopping.",
     start_url: "/",
     display: "standalone",
-    background_color: "#faf7f2",
-    theme_color: "#faf7f2",
+    background_color: "#F7F5EE",
+    theme_color: "#F7F5EE",
+    icons: [
+      {
+        src: "/brand/hapa-logo.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+      },
+    ],
   };
 }

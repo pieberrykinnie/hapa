@@ -1,21 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  /* hapa palette — warm paper + pine (no purples, no glow) */
-  --color-paper: #faf7f2;
+  /* hapa brand palette — the five approved swatches. Every other token below
+     is a computed tint of these five; nothing else is hand-picked. */
+  --color-lime: #ddfcad;
+  --color-sage: #c8e087;
+  --color-green: #3f7d20;
+  --color-canvas: #f7f5ee;
+  --color-espresso: #14080e;
+
+  /* semantic surface/text tokens, derived from the five brand swatches */
+  --color-paper: var(--color-canvas);
   --color-card: #ffffff;
-  --color-sand: #f0ebe2;
-  --color-sand-deep: #efe9dd;
-  --color-ink: #201d1a;
-  --color-ink-soft: #55524a;
-  --color-ink-faint: #8a8378;
-  --color-line: #e0dacd;
-  --color-pine: #3d6b4f;
-  --color-pine-soft: #6f9c81;
-  --color-pine-tint: rgba(61, 107, 79, 0.12);
-  --color-bubble: #33302b;
-  --color-line-dark: #4a453e;
-  --color-paper-dim: #d9d4c9;
+  --color-sand: #edf0d7; /* sage @ 22% over canvas */
+  --color-sand-deep: #e7eecb; /* sage @ 34% over canvas */
+  --color-ink: var(--color-espresso);
+  --color-ink-soft: #544a4d; /* ink @ 72% over canvas */
+  --color-ink-faint: #918a89; /* ink @ 45% over canvas */
+  --color-line: #dcd9d3; /* ink @ 12% over canvas */
+  --color-pine: var(--color-green);
+  --color-pine-soft: var(--color-sage);
+  --color-pine-tint: rgba(63, 125, 32, 0.12);
+  --color-bubble: #17110f; /* ink @ 92% over green */
+  --color-line-dark: #463c3f; /* canvas @ 22% over ink */
+  --color-paper-dim: #d3cfca; /* ink @ 16% over canvas */
 
   --font-display: var(--font-manrope);
   --font-sans: var(--font-manrope);
@@ -24,8 +32,8 @@
   --radius-card: 22px;
   --radius-frame: 16px;
 
-  --shadow-card: 0 8px 28px rgba(32, 29, 26, 0.12);
-  --shadow-float: 0 4px 12px rgba(32, 29, 26, 0.12);
+  --shadow-card: 0 8px 28px rgba(20, 8, 14, 0.12);
+  --shadow-float: 0 4px 12px rgba(20, 8, 14, 0.12);
 }
 
 html,
@@ -83,15 +91,15 @@ input:focus-visible {
 .stripes {
   background: repeating-linear-gradient(
     45deg,
-    #e8e6dd 0 12px,
-    #f2f0e8 12px 24px
+    #e9efcf 0 12px,
+    #eff1db 12px 24px
   );
 }
 .stripes-light {
   background: repeating-linear-gradient(
     45deg,
-    #f0ebe2 0 12px,
-    #faf7f2 12px 24px
+    #f1f2e2 0 12px,
+    #f7f5ee 12px 24px
   );
 }
 

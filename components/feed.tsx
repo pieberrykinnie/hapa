@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { galleryFor } from "@/lib/gallery";
 import { resetLocalOnboarding } from "@/lib/onboarding/local-store";
 import type { Product } from "@/lib/types";
+import { AddVibeRadial, type AddVibeMode } from "./add-vibe-radial";
 import { useHapa } from "./hapa-provider";
-import { BookmarkIcon, MicIcon } from "./icons";
+import { BookmarkIcon } from "./icons";
 import { ProductPhoto } from "./product-photo";
 
 const CATEGORIES = [
@@ -21,17 +22,18 @@ const CATEGORIES = [
 // Card height is container minus 90px, gap is 14px → the next card peeks ~76px.
 const PEEK = 90;
 const GAP = 14;
-// Ignore scroll jitter below this before flipping the chip bar's visibility.
-const CHIP_HIDE_THRESHOLD = 12;
+// A touch has to move this many px before it counts as a swipe rather than a
+// tap on a card/button — keeps taps from flickering the chip bar.
+const SWIPE_MOVE_PX = 6;
 
 export function Feed({
   onOpenProduct,
   onBuy,
-  onOpenVoice,
+  onOpenAddVibe,
 }: {
   onOpenProduct: (product: Product, layoutKey: string) => void;
   onBuy: (product: Product) => void;
-  onOpenVoice: () => void;
+  onOpenAddVibe: (mode: AddVibeMode) => void;
 }) {
   const {
     items,
@@ -44,8 +46,11 @@ export function Feed({
     dismissToast,
   } = useHapa();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastScrollRef = useRef(0);
+  const scrollFrameRef = useRef(0);
+  const touchStartY = useRef<number | null>(null);
+  const swiping = useRef(false);
   const [chipsHidden, setChipsHidden] = useState(false);
+  const [addVibeOpen, setAddVibeOpen] = useState(false);
 
   const showingSaved = activeCategory === "saved";
   const list = showingSaved ? saved : items;
@@ -54,9 +59,8 @@ export function Feed({
   useEffect(() => {
     if (status !== "shifting" && status !== "loading") return;
     scrollRef.current?.scrollTo({ top: 0 });
-    lastScrollRef.current = 0;
-    // reveal the chips a frame after the scroll reset lands, so the two
-    // don't fight over the same paint
+    swiping.current = false;
+    touchStartY.current = null;
     const id = requestAnimationFrame(() => setChipsHidden(false));
     return () => cancelAnimationFrame(id);
   }, [status]);
@@ -68,36 +72,91 @@ export function Feed({
     return () => window.clearTimeout(t);
   }, [toast, dismissToast]);
 
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    // chips retreat as you scroll down, come back the moment you scroll up
-    const y = el.scrollTop;
-    const delta = y - lastScrollRef.current;
-    if (Math.abs(delta) > CHIP_HIDE_THRESHOLD) {
-      setChipsHidden(delta > 0 && y > 40);
-      lastScrollRef.current = y;
-    }
-
-    if (showingSaved) return; // saved list isn't paginated
-    // prefetch when ~3 cards from the end
-    const nearEnd =
-      el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 3;
-    if (nearEnd) loadMore();
+  // Chips duck out only for an actual swipe (real vertical movement, not a
+  // tap) and reappear the instant the finger lifts — not when the snap
+  // animation happens to settle, which can lag well behind release.
+  const handlePointerDown = (e: PointerEvent) => {
+    touchStartY.current = e.clientY;
   };
+
+  const handlePointerMove = (e: PointerEvent) => {
+    if (touchStartY.current === null || swiping.current) return;
+    if (Math.abs(e.clientY - touchStartY.current) > SWIPE_MOVE_PX) {
+      swiping.current = true;
+      setChipsHidden(true);
+      setAddVibeOpen(false);
+    }
+  };
+
+  const endSwipe = () => {
+    touchStartY.current = null;
+    if (swiping.current) {
+      swiping.current = false;
+      setChipsHidden(false);
+    }
+  };
+
+  // Scroll events fire far faster than paint; coalescing to one frame keeps the
+  // layout reads below (scrollHeight/clientHeight) from flushing style on every
+  // event, which is what turns a long feed's scroll into a stutter.
+  const handleScroll = () => {
+    if (scrollFrameRef.current) return;
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = 0;
+      const el = scrollRef.current;
+      if (!el) return;
+      setAddVibeOpen(false);
+      if (showingSaved) return; // saved list isn't paginated
+      // prefetch when ~3 cards from the end
+      const nearEnd =
+        el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 3;
+      if (nearEnd) loadMore();
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+    };
+  }, []);
 
   const showSkeletons = list.length === 0 && status !== "idle";
 
+  // Held across renders so toggling the chip bar mid-scroll doesn't re-render
+  // every mounted card (each carries a `layoutId` element framer re-measures).
+  const cards = useMemo(
+    () =>
+      list.map((product, i) => (
+        <FeedCard
+          key={`${product.id}-${i}`}
+          // the looping feed repeats products, so the shared-element id
+          // must be unique per card instance, not per product
+          layoutKey={`photo-${product.id}-${i}`}
+          product={product}
+          onOpen={() => onOpenProduct(product, `photo-${product.id}-${i}`)}
+          onBuy={() => onBuy(product)}
+        />
+      )),
+    [list, onOpenProduct, onBuy],
+  );
+
   return (
     <div className="relative flex h-dvh flex-col bg-paper">
-      {/* category chips — collapse on scroll down, return on scroll up */}
+      {/* Category chips — duck out for the duration of a swipe (see the
+          pointer handlers above). They fade and lift rather than collapsing
+          their height: the bar sits above the snap scroller, so animating its
+          height resized the scroller — and every card, which is sized off it —
+          on every frame of the transition. A `y mandatory` scroller re-snaps
+          whenever it's resized, so that fought the gesture, worst on the
+          reveal, where the height animates back to "auto" and framer has to
+          re-measure the subtree each frame. */}
       <motion.div
         className="relative z-10 shrink-0 overflow-hidden pt-[calc(env(safe-area-inset-top)+10px)]"
         animate={{
-          height: chipsHidden ? 0 : "auto",
+          y: chipsHidden ? -10 : 0,
           opacity: chipsHidden ? 0 : 1,
         }}
+        style={{ pointerEvents: chipsHidden ? "none" : "auto" }}
         initial={false}
         transition={{ duration: 0.18, ease: "easeOut" }}
       >
@@ -164,6 +223,11 @@ export function Feed({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endSwipe}
+        onPointerCancel={endSwipe}
+        onPointerLeave={endSwipe}
         className="snap-feed flex-1 overflow-y-auto px-4"
         style={{ display: "flex", flexDirection: "column", gap: GAP }}
       >
@@ -177,7 +241,7 @@ export function Feed({
           ))
         ) : list.length === 0 && showingSaved ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-10 text-center">
-            <BookmarkIcon size={28} color="#8a8378" />
+            <BookmarkIcon size={28} color="#918a89" />
             <p className="font-display text-base font-bold text-ink">
               Nothing saved yet
             </p>
@@ -186,30 +250,17 @@ export function Feed({
             </p>
           </div>
         ) : (
-          list.map((product, i) => (
-            <FeedCard
-              key={`${product.id}-${i}`}
-              // the looping feed repeats products, so the shared-element id
-              // must be unique per card instance, not per product
-              layoutKey={`photo-${product.id}-${i}`}
-              product={product}
-              onOpen={() => onOpenProduct(product, `photo-${product.id}-${i}`)}
-              onBuy={() => onBuy(product)}
-            />
-          ))
+          cards
         )}
         <div className="h-1 shrink-0" />
       </div>
 
-      {/* mic */}
-      <button
-        type="button"
-        aria-label="Talk to hapa"
-        onClick={onOpenVoice}
-        className="absolute bottom-[calc(env(safe-area-inset-bottom)+24px)] right-[26px] z-20 flex size-12 items-center justify-center rounded-full bg-pine shadow-float"
-      >
-        <MicIcon color="#faf7f2" />
-      </button>
+      {/* add — text, speech, or photo, hapa's three ways to steer the feed */}
+      <AddVibeRadial
+        open={addVibeOpen}
+        onOpenChange={setAddVibeOpen}
+        onSelect={onOpenAddVibe}
+      />
     </div>
   );
 }
@@ -278,7 +329,7 @@ function FeedCard({
           <BookmarkIcon
             size={20}
             filled={saved}
-            color={saved ? "#3d6b4f" : "#201d1a"}
+            color={saved ? "#3f7d20" : "#14080e"}
           />
         </button>
 

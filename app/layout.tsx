@@ -5,11 +5,15 @@ import "./globals.css";
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
   title: "hapa",
   description: "Your feed, your vibe. An AI DJ for shopping.",
+  icons: {
+    icon: "/brand/hapa-logo.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -18,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#faf7f2",
+  themeColor: "#F7F5EE",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { BillingMethod, Product, StyleDNA } from "@/lib/types";
+import type { AddVibeMode } from "./add-vibe-radial";
 import { Feed } from "./feed";
 import { HapaProvider, useHapa } from "./hapa-provider";
 import { Onboarding } from "./onboarding";
 import { OnboardingBilling } from "./onboarding-billing";
 import { OnboardingIdentity } from "./onboarding-identity";
+import { PhotoVibeOverlay } from "./photo-vibe-overlay";
 import { ProductPage } from "./product-page";
 import { PurchaseFlow } from "./purchase-flow";
+import { TextVibeOverlay } from "./text-vibe-overlay";
 import { VoiceOverlay } from "./voice-overlay";
 
 export function AppShell({ initialDNA, initialBilling }: { initialDNA: StyleDNA; initialBilling: BillingMethod | null }) {
@@ -24,7 +27,7 @@ export function AppShell({ initialDNA, initialBilling }: { initialDNA: StyleDNA;
 
 function Screens() {
   const { screen, dna, order, requestPurchase } = useHapa();
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [addVibeMode, setAddVibeMode] = useState<AddVibeMode | null>(null);
   const [opened, setOpened] = useState<{
     product: Product;
     layoutKey: string;
@@ -54,7 +57,7 @@ function Screens() {
       <Feed
         onOpenProduct={(product, layoutKey) => setOpened({ product, layoutKey })}
         onBuy={requestPurchase}
-        onOpenVoice={() => setVoiceOpen(true)}
+        onOpenAddVibe={setAddVibeMode}
       />
       <AnimatePresence>
         {opened && (
@@ -66,8 +69,14 @@ function Screens() {
             onBuy={() => requestPurchase(opened.product)}
           />
         )}
-        {voiceOpen && (
-          <VoiceOverlay key="voice" onClose={() => setVoiceOpen(false)} />
+        {addVibeMode === "speech" && (
+          <VoiceOverlay key="speech" onClose={() => setAddVibeMode(null)} />
+        )}
+        {addVibeMode === "text" && (
+          <TextVibeOverlay key="text" onClose={() => setAddVibeMode(null)} />
+        )}
+        {addVibeMode === "photo" && (
+          <PhotoVibeOverlay key="photo" onClose={() => setAddVibeMode(null)} />
         )}
         {order && <PurchaseFlow key="purchase" />}
       </AnimatePresence>

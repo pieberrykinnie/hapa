@@ -133,6 +133,7 @@ hapa/
 │   ├── fallback_feed.json               # ≥30 items
 │   └── demo_catalog.json                # supported test-checkout offers
 ├── public/
+│   ├── brand/hapa-logo.svg              # primary lockup: digital-mall mark + wordmark
 │   ├── icon-192.png
 │   ├── icon-512.png
 │   ├── apple-touch-icon.png
@@ -728,27 +729,77 @@ Native `app/manifest.ts`, standalone display, dark theme, icons at 192/512, Appl
 
 ### 12.2 Visual language
 
+#### 12.2.1 Brand palette
+
+Five approved swatches. Every other surface, text, and border color in the app is a computed tint of these five — nothing else is hand-picked.
+
+| Swatch | Hex | Role |
+|---|---|---|
+| Lime | `#DDFCAD` | Bright highlight — sale/discount badges, rare high-energy accents. Pairs with ink text, never white. |
+| Sage | `#C8E087` | Soft secondary green — quiet accents (e.g. alternating voice-waveform bars), tint source for neutral warm surfaces (sand). |
+| Green | `#3F7D20` | Primary accent — CTAs that aren't the main black button, active/selected states, links, the "hapa" cue color, verified/success state. |
+| Canvas | `#F7F5EE` | Base background (paper). Warm off-white, never pure white for full-bleed surfaces. |
+| Ink | `#14080E` | Primary text and the near-black surface for full-bleed dark screens (voice overlay, purchase sheet). Has a faint wine undertone — not neutral gray. |
+
+Implementation lives in `app/globals.css`:
+
 ```css
 @theme {
-  --color-bg: #0a0a0a;
-  --color-fg: #f5f5f5;
-  --color-muted: #a1a1aa;
-  --color-accent: #c7f04a;
-  --color-danger: #ff5c5c;
-  --color-warning: #f5c451;
-  --font-display: var(--font-manrope);
+  /* the five approved brand swatches */
+  --color-lime: #ddfcad;
+  --color-sage: #c8e087;
+  --color-green: #3f7d20;
+  --color-canvas: #f7f5ee;
+  --color-espresso: #14080e;
+
+  /* semantic tokens — computed tints of the five swatches above */
+  --color-paper: var(--color-canvas);
+  --color-card: #ffffff;
+  --color-sand: #edf0d7;         /* sage @ 22% over canvas */
+  --color-sand-deep: #e7eecb;    /* sage @ 34% over canvas */
+  --color-ink: var(--color-espresso);
+  --color-ink-soft: #544a4d;     /* ink @ 72% over canvas */
+  --color-ink-faint: #918a89;    /* ink @ 45% over canvas */
+  --color-line: #dcd9d3;         /* ink @ 12% over canvas */
+  --color-pine: var(--color-green);
+  --color-pine-soft: var(--color-sage);
+  --color-pine-tint: rgba(63, 125, 32, 0.12);
+  --color-bubble: #17110f;       /* ink @ 92% over green */
+  --color-line-dark: #463c3f;    /* canvas @ 22% over ink */
+  --color-paper-dim: #d3cfca;    /* ink @ 16% over canvas */
 }
 ```
 
-- Edge-to-edge, high contrast, acid-lime primary accent.
-- Logo: custom-drawn **HAPA** wordmark based on Manrope ExtraBold.
-- Main headings: Manrope 700, 32–40px, `-0.03em` tracking.
-- Screen headings: Manrope 700, 24–28px.
-- Product names: Manrope 600, 17–18px.
-- Body: Manrope 400, 16px / 24px.
-- Buttons: Manrope 700, 15px.
-- Prices: Manrope 700, 18–20px.
-- Labels: Manrope 600, 12px, `0.04em` tracking.
+Never introduce a purple, a neon glow, or a pure-black/pure-white full-bleed surface. `--color-card` is the one deliberate exception to "everything derives from the five swatches" — pure white is needed for product-photo cards to sit above the warm canvas without color cast.
+
+#### 12.2.2 Typography
+
+**Manrope, throughout.** It reads modern and retail-friendly without tipping editorial, futuristic, or generic-AI-product. No second typeface — differentiation comes from the custom wordmark, photography, color, and layout, not from mixing type families.
+
+| Use | Weight | Size | Tracking |
+|---|---|---|---|
+| Logo | Custom-drawn wordmark, Manrope ExtraBold-inspired proportions | — | — |
+| Main headings | Manrope 700 | 32–40px | `-0.03em` |
+| Screen headings | Manrope 700 | 24–28px | — |
+| Product names | Manrope 600 | 17–18px | — |
+| Body | Manrope 400 | 16px / 24px line-height | — |
+| Buttons | Manrope 700 | 15px | — |
+| Prices | Manrope 700 | 18–20px | — |
+| Labels | Manrope 600 | 12px | `0.04em` |
+
+Sentence case everywhere; avoid excessive uppercase. `app/layout.tsx` loads Manrope once via `next/font/google` with weights `400/600/700/800`, exposed as `--font-manrope`, and both `--font-display` and `--font-sans` in `app/globals.css` point at it — there is no second font stack to keep in sync.
+
+#### 12.2.3 Logo
+
+`public/brand/hapa-logo.svg` is the primary lockup: a rounded ink square containing a lime/green tiled-cart mark ("one cart, many shops"), paired with a custom-vector HAPA wordmark (no font dependency — it is drawn, not set in Manrope, even though its proportions echo Manrope ExtraBold).
+
+- `components/hapa-logo.tsx` exports `HapaMark` (full lockup, for splash/hero placements with room to read — login, empty states) and `HapaWordmark` (the wordmark cropped out of the same source file, ink-colored, for compact header use where the tiled-cart mark would be illegible at small size). Onboarding headers (`onboarding-identity.tsx`, `onboarding.tsx`, `onboarding-billing.tsx`) use `HapaWordmark`.
+- Never recolor the wordmark, stretch it off-aspect, or place it on a background that fails contrast against ink strokes.
+- The wordmark is deliberately not the "hapa" text label it replaced — do not reintroduce a text-based logo fallback.
+
+#### 12.2.4 Motion and layout
+
+- Edge-to-edge, high contrast, green/lime primary accent.
 - Normal transitions 200–280 ms; onboarding beat ≤700 ms.
 - Vibe toast: `[Vibe Shift: {label}]`.
 - Financial success uses a distinct verified check state; never reuse optimistic vibe styling.
