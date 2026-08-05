@@ -51,12 +51,9 @@ interface SerpApiImmersiveProductResponse {
 }
 
 /**
- * `dna.likes` appends new signals at the end (see `applyVibeShift` in
- * hapa-provider.tsx) — the shopper's most recent request, e.g. what they
- * just said by voice, is the *tail* of the array, not the head. Taking the
- * last N and reversing them prepends the newest term to the front of the
- * built query string, so it leads the search instead of trailing behind
- * older, less relevant likes.
+ * Active voice/text/photo steering now replaces `dna.likes`; taking the last
+ * N still caps combined requests such as "camping, rain, waterproof" and
+ * preserves their most recently stated order.
  */
 function mostRecent(keywords: string[], n: number): string[] {
   return keywords.slice(-n).reverse();

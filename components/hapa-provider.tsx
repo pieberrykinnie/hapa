@@ -378,8 +378,9 @@ export function HapaProvider({
     });
   }, [dna, activeCategory, status, fetchFeed]);
 
-  // Voice tool handler: merge deltas into StyleDNA, build plain-language toast,
-  // flush the feed and refetch. A decisive reset, not a reshuffle.
+  // Voice/text/photo steering replaces the active search instead of appending
+  // to it. Durable exclusions remain part of the shopper's taste profile, but
+  // every new positive request starts from a clean keyword list.
   const applyVibeShift = useCallback(
     (rawShift: VibeShift) => {
       const shift: VibeShift = {
@@ -390,15 +391,9 @@ export function HapaProvider({
       setDNA((prev) => {
         const next: StyleDNA = {
           ...prev,
-          likes: dedupe([
-            ...prev.likes.filter(
-              (t) =>
-                !shift.remove_keywords.includes(t) &&
-                // an exclusion always wins over an existing positive preference — FR-012
-                !shift.dealbreakers.includes(t),
-            ),
-            ...shift.add_keywords,
-          ]),
+          likes: shift.add_keywords.filter(
+            (tag) => !shift.dealbreakers.includes(tag),
+          ),
           dealbreakers: dedupe([...prev.dealbreakers, ...shift.dealbreakers]),
           vibeHistory: [
             ...prev.vibeHistory,
@@ -406,12 +401,15 @@ export function HapaProvider({
           ],
         };
         saveJSON(DNA_STORAGE_KEY, next);
-        const more = shift.add_keywords.join(" & ");
-        const less = [...shift.dealbreakers, ...shift.remove_keywords].join(" & ");
+        const query = shift.add_keywords.join(" & ") || "a fresh mix";
+        const excluded = [
+          ...shift.dealbreakers,
+          ...shift.remove_keywords,
+        ].join(" & ");
         setToast(
-          less
-            ? `Updating your feed: more ${more} · less ${less}`
-            : `Updating your feed: more ${more}`,
+          excluded
+            ? `Searching for ${query} · excluding ${excluded}`
+            : `Searching for ${query}`,
         );
         setActiveCategory("for-you");
         setStatus("shifting");
