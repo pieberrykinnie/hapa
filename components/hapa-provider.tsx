@@ -145,11 +145,12 @@ export function HapaProvider({ children }: { children: ReactNode }) {
       if (opts.replace) seenRef.current = new Set();
       const keywords =
         opts.category === "for-you" ? opts.dna.likes : [opts.category];
+const seenList = Array.from(seenRef.current).slice(-120);
       const params = new URLSearchParams({
         keywords: keywords.join(","),
         exclude: opts.dna.dealbreakers.join(","),
         cursor: String(opts.cursor),
-        seen: Array.from(seenRef.current).join(","),
+        seen: seenList.join(","),
       });
       try {
         const res = await fetch(`/api/feed?${params}`);
