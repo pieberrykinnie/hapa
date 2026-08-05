@@ -49,7 +49,9 @@ export function safeSuggestions(input: unknown): StyleSuggestion[] | null {
   const result: StyleSuggestion[] = [];
 
   for (let position = 0; position < input.length; position += 1) {
-    const raw = input[position] as Record<string, unknown>;
+    const rawValue = input[position];
+    if (!rawValue || typeof rawValue !== "object") return null;
+    const raw = rawValue as Record<string, unknown>;
     const category = normalizeToken(String(raw.category ?? ""));
     const title = String(raw.title ?? "").trim().slice(0, 80);
     const description = String(raw.description ?? "").trim().slice(0, 180);
