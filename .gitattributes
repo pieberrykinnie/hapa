@@ -1,0 +1,4 @@
+# Shell scripts must stay LF, even on Windows checkouts — CRLF breaks bash
+# (`bad interpreter: /bin/bash^M`). Spec Kit's scripts under .specify/scripts/bash
+# are invoked by the coding agent on every /speckit-* command.
+*.sh text eol=lf
