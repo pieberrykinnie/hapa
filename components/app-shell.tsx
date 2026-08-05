@@ -6,8 +6,10 @@ import type { Product } from "@/lib/types";
 import { Feed } from "./feed";
 import { HapaProvider, useHapa } from "./hapa-provider";
 import { Onboarding } from "./onboarding";
+import { OnboardingBilling } from "./onboarding-billing";
+import { OnboardingIdentity } from "./onboarding-identity";
 import { ProductPage } from "./product-page";
-import { RedirectOverlay } from "./redirect-overlay";
+import { PurchaseFlow } from "./purchase-flow";
 import { VoiceOverlay } from "./voice-overlay";
 
 export function AppShell() {
@@ -21,15 +23,16 @@ export function AppShell() {
 }
 
 function Screens() {
-  const { screen } = useHapa();
+  const { screen, dna, order, requestPurchase } = useHapa();
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [opened, setOpened] = useState<{
     product: Product;
     layoutKey: string;
   } | null>(null);
-  const [buying, setBuying] = useState<Product | null>(null);
 
-  if (screen === "onboarding") return <Onboarding />;
+  if (screen === "identity") return <OnboardingIdentity />;
+  if (screen === "swipe") return <Onboarding />;
+  if (screen === "billing") return <OnboardingBilling />;
 
   if (screen === "building") {
     return (
@@ -40,7 +43,7 @@ function Screens() {
           transition={{ duration: 1.2, ease: "easeInOut" }}
         />
         <span className="font-display text-base font-semibold text-ink">
-          Building your vibe…
+          {dna.name ? `Building your vibe, ${dna.name}…` : "Building your vibe…"}
         </span>
       </div>
     );
@@ -50,7 +53,7 @@ function Screens() {
     <>
       <Feed
         onOpenProduct={(product, layoutKey) => setOpened({ product, layoutKey })}
-        onBuy={setBuying}
+        onBuy={requestPurchase}
         onOpenVoice={() => setVoiceOpen(true)}
       />
       <AnimatePresence>
@@ -60,19 +63,13 @@ function Screens() {
             product={opened.product}
             layoutKey={opened.layoutKey}
             onBack={() => setOpened(null)}
-            onBuy={() => setBuying(opened.product)}
+            onBuy={() => requestPurchase(opened.product)}
           />
         )}
         {voiceOpen && (
           <VoiceOverlay key="voice" onClose={() => setVoiceOpen(false)} />
         )}
-        {buying && (
-          <RedirectOverlay
-            key="redirect"
-            product={buying}
-            onDone={() => setBuying(null)}
-          />
-        )}
+        {order && <PurchaseFlow key="purchase" />}
       </AnimatePresence>
     </>
   );

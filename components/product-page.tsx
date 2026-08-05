@@ -105,10 +105,10 @@ export function ProductPage({
           onClick={onBuy}
           className="w-full rounded-full bg-ink py-[17px] font-display text-base font-bold text-paper"
         >
-          Buy at {product.merchant} ↗
+          Buy now
         </button>
         <p className="mt-2.5 text-center text-xs text-ink-faint">
-          Opens the real merchant page — checkout happens there.
+          hapa checks out at {product.merchant} for you — you confirm first.
         </p>
       </div>
     </motion.div>

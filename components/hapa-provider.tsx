@@ -10,24 +10,50 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { FeedResponse, Product, StyleDNA, VibeShift } from "@/lib/types";
+import {
+  STEP_MS,
+  buildSteps,
+  makeOrderRef,
+} from "@/lib/purchase-agent";
+import type {
+  BillingMethod,
+  BillingProvider,
+  FeedResponse,
+  Order,
+  Product,
+  StyleDNA,
+  VibeImage,
+  VibeShift,
+} from "@/lib/types";
 
 const DNA_STORAGE_KEY = "hapa.dna";
+const BILLING_STORAGE_KEY = "hapa.billing";
 
-export type Screen = "onboarding" | "building" | "feed";
+export type Screen = "identity" | "swipe" | "billing" | "building" | "feed";
 
 interface HapaContextValue {
   screen: Screen;
   dna: StyleDNA;
+  vibeImages: VibeImage[];
+  billing: BillingMethod | null;
+  order: Order | null;
   items: Product[];
   activeCategory: string;
   status: "idle" | "loading" | "shifting";
   toast: string | null;
+  setName: (name: string) => void;
+  addVibeImages: (files: File[]) => void;
+  removeVibeImage: (id: string) => void;
+  finishIdentity: () => void;
   swipe: (tags: string[], liked: boolean, isLast: boolean) => void;
+  connectBilling: (provider: BillingProvider) => void;
   setCategory: (category: string) => void;
   loadMore: () => void;
   applyVibeShift: (shift: VibeShift) => void;
   dismissToast: () => void;
+  requestPurchase: (product: Product) => void;
+  confirmPurchase: () => void;
+  cancelPurchase: () => void;
 }
 
 const HapaContext = createContext<HapaContextValue | null>(null);
@@ -38,28 +64,36 @@ export function useHapa() {
   return ctx;
 }
 
-const EMPTY_DNA: StyleDNA = { likes: [], dealbreakers: [], vibeHistory: [] };
+const EMPTY_DNA: StyleDNA = {
+  name: "",
+  likes: [],
+  dealbreakers: [],
+  vibeHistory: [],
+};
 
-function loadDNA(): StyleDNA | null {
+function loadJSON<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(DNA_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StyleDNA) : null;
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
   }
 }
 
-function saveDNA(dna: StyleDNA) {
+function saveJSON(key: string, value: unknown) {
   try {
-    localStorage.setItem(DNA_STORAGE_KEY, JSON.stringify(dna));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // storage unavailable — demo continues in memory
   }
 }
 
 export function HapaProvider({ children }: { children: ReactNode }) {
-  const [screen, setScreen] = useState<Screen>("onboarding");
+  const [screen, setScreen] = useState<Screen>("identity");
   const [dna, setDNA] = useState<StyleDNA>(EMPTY_DNA);
+  const [vibeImages, setVibeImages] = useState<VibeImage[]>([]);
+  const [billing, setBilling] = useState<BillingMethod | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState("for-you");
   const [status, setStatus] = useState<"idle" | "loading" | "shifting">("idle");
@@ -67,6 +101,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
   const cursorRef = useRef<number | null>(0);
   const fetchIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
+  const agentTimersRef = useRef<number[]>([]);
 
   const fetchFeed = useCallback(
     async (opts: {
@@ -106,17 +141,64 @@ export function HapaProvider({ children }: { children: ReactNode }) {
     const params = new URLSearchParams(window.location.search);
     if (params.get("onboard")) {
       localStorage.removeItem(DNA_STORAGE_KEY);
+      localStorage.removeItem(BILLING_STORAGE_KEY);
       return;
     }
-    const stored = loadDNA();
-    if (stored && stored.likes.length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDNA(stored);
+    const storedDNA = loadJSON<StyleDNA>(DNA_STORAGE_KEY);
+    const storedBilling = loadJSON<BillingMethod>(BILLING_STORAGE_KEY);
+    /* Hydrating persisted state is exactly the "sync from an external system"
+       case an effect is for — localStorage can't be read during SSR render. */
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (storedBilling) setBilling(storedBilling);
+    if (storedDNA && storedDNA.likes.length > 0 && storedBilling) {
+      setDNA({ ...EMPTY_DNA, ...storedDNA });
       setScreen("feed");
       setStatus("loading");
-      fetchFeed({ dna: stored, category: "for-you", cursor: 0, replace: true });
+      fetchFeed({
+        dna: storedDNA,
+        category: "for-you",
+        cursor: 0,
+        replace: true,
+      });
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [fetchFeed]);
+
+  // object URLs are revoked on unmount so uploads don't leak
+  useEffect(() => {
+    return () => {
+      agentTimersRef.current.forEach((t) => window.clearTimeout(t));
+    };
+  }, []);
+
+  /* ── onboarding ──────────────────────────────────────────────────────── */
+
+  const setName = useCallback((name: string) => {
+    setDNA((prev) => {
+      const next = { ...prev, name };
+      saveJSON(DNA_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const addVibeImages = useCallback((files: File[]) => {
+    const added = files.map((file) => ({
+      id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 7)}`,
+      url: URL.createObjectURL(file),
+      name: file.name,
+    }));
+    setVibeImages((prev) => [...prev, ...added]);
+  }, []);
+
+  const removeVibeImage = useCallback((id: string) => {
+    setVibeImages((prev) => {
+      const hit = prev.find((v) => v.id === id);
+      if (hit) URL.revokeObjectURL(hit.url);
+      return prev.filter((v) => v.id !== id);
+    });
+  }, []);
+
+  const finishIdentity = useCallback(() => setScreen("swipe"), []);
 
   const swipe = useCallback(
     (tags: string[], liked: boolean, isLast: boolean) => {
@@ -124,19 +206,51 @@ export function HapaProvider({ children }: { children: ReactNode }) {
         const next: StyleDNA = liked
           ? { ...prev, likes: dedupe([...prev.likes, ...tags]) }
           : { ...prev, dealbreakers: dedupe([...prev.dealbreakers, ...tags]) };
-        saveDNA(next);
-        if (isLast) {
-          setScreen("building");
-          setStatus("loading");
-          fetchFeed({ dna: next, category: "for-you", cursor: 0, replace: true });
-          // brief "building your vibe" moment, then straight into the feed
-          window.setTimeout(() => setScreen("feed"), 1200);
-        }
+        saveJSON(DNA_STORAGE_KEY, next);
+        // billing is the last onboarding beat, then straight into the feed
+        if (isLast) setScreen("billing");
         return next;
       });
     },
+    [],
+  );
+
+  /**
+   * Simulated provider connect. A real integration hands back exactly this
+   * shape from a hosted flow — we never see or store the underlying card.
+   */
+  const connectBilling = useCallback(
+    (provider: BillingProvider) => {
+      const label =
+        provider === "card"
+          ? "Visa ·· 4242"
+          : provider === "paypal"
+            ? "PayPal"
+            : "Affirm";
+      const method: BillingMethod = {
+        provider,
+        label,
+        connectedAt: new Date().toISOString(),
+      };
+      setBilling(method);
+      saveJSON(BILLING_STORAGE_KEY, method);
+      setScreen("building");
+      setStatus("loading");
+      setDNA((current) => {
+        fetchFeed({
+          dna: current,
+          category: "for-you",
+          cursor: 0,
+          replace: true,
+        });
+        return current;
+      });
+      window.setTimeout(() => setScreen("feed"), 1200);
+    },
     [fetchFeed],
   );
+
+  /* ── feed ────────────────────────────────────────────────────────────── */
 
   const setCategory = useCallback(
     (category: string) => {
@@ -166,6 +280,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
     (shift: VibeShift) => {
       setDNA((prev) => {
         const next: StyleDNA = {
+          ...prev,
           likes: dedupe([
             ...prev.likes.filter((t) => !shift.remove_keywords.includes(t)),
             ...shift.add_keywords,
@@ -176,7 +291,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
             { label: shift.add_keywords.join(" & "), at: new Date().toISOString() },
           ],
         };
-        saveDNA(next);
+        saveJSON(DNA_STORAGE_KEY, next);
         const more = shift.add_keywords.join(" & ");
         const less = [...shift.dealbreakers, ...shift.remove_keywords].join(" & ");
         setToast(`Updating your feed: more ${more} · less ${less}`);
@@ -192,32 +307,116 @@ export function HapaProvider({ children }: { children: ReactNode }) {
 
   const dismissToast = useCallback(() => setToast(null), []);
 
+  /* ── agentic checkout ────────────────────────────────────────────────── */
+
+  // Buy now never pays directly — it opens a confirm step first, so a stray
+  // tap on a scrolling feed can't spend money.
+  const requestPurchase = useCallback((product: Product) => {
+    setOrder({
+      product,
+      stage: "confirm",
+      steps: [],
+      orderRef: null,
+      error: null,
+    });
+  }, []);
+
+  const cancelPurchase = useCallback(() => {
+    agentTimersRef.current.forEach((t) => window.clearTimeout(t));
+    agentTimersRef.current = [];
+    setOrder(null);
+  }, []);
+
+  const confirmPurchase = useCallback(() => {
+    setOrder((prev) => {
+      if (!prev || !billing) return prev;
+      const labels = buildSteps(prev.product, billing);
+
+      agentTimersRef.current.forEach((t) => window.clearTimeout(t));
+      agentTimersRef.current = labels.map((_, i) =>
+        window.setTimeout(
+          () =>
+            setOrder((o) =>
+              o && o.stage === "working"
+                ? {
+                    ...o,
+                    steps: o.steps.map((s, si) =>
+                      si <= i ? { ...s, done: true } : s,
+                    ),
+                  }
+                : o,
+            ),
+          STEP_MS * (i + 1),
+        ),
+      );
+      agentTimersRef.current.push(
+        window.setTimeout(
+          () =>
+            setOrder((o) =>
+              o && o.stage === "working"
+                ? { ...o, stage: "done", orderRef: makeOrderRef() }
+                : o,
+            ),
+          STEP_MS * (labels.length + 0.6),
+        ),
+      );
+
+      return {
+        ...prev,
+        stage: "working",
+        steps: labels.map((label) => ({ label, done: false })),
+      };
+    });
+  }, [billing]);
+
   const value = useMemo<HapaContextValue>(
     () => ({
       screen,
       dna,
+      vibeImages,
+      billing,
+      order,
       items,
       activeCategory,
       status,
       toast,
+      setName,
+      addVibeImages,
+      removeVibeImage,
+      finishIdentity,
       swipe,
+      connectBilling,
       setCategory,
       loadMore,
       applyVibeShift,
       dismissToast,
+      requestPurchase,
+      confirmPurchase,
+      cancelPurchase,
     }),
     [
       screen,
       dna,
+      vibeImages,
+      billing,
+      order,
       items,
       activeCategory,
       status,
       toast,
+      setName,
+      addVibeImages,
+      removeVibeImage,
+      finishIdentity,
       swipe,
+      connectBilling,
       setCategory,
       loadMore,
       applyVibeShift,
       dismissToast,
+      requestPurchase,
+      confirmPurchase,
+      cancelPurchase,
     ],
   );
 
