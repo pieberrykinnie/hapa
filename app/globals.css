@@ -1,26 +1,92 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* hapa palette — warm paper + pine (no purples, no glow) */
+  --color-paper: #faf7f2;
+  --color-card: #ffffff;
+  --color-sand: #f0ebe2;
+  --color-sand-deep: #efe9dd;
+  --color-ink: #201d1a;
+  --color-ink-soft: #55524a;
+  --color-ink-faint: #8a8378;
+  --color-line: #e0dacd;
+  --color-pine: #3d6b4f;
+  --color-pine-soft: #6f9c81;
+  --color-pine-tint: rgba(61, 107, 79, 0.12);
+  --color-bubble: #33302b;
+  --color-line-dark: #4a453e;
+  --color-paper-dim: #d9d4c9;
+
+  --font-display: var(--font-sora);
+  --font-sans: var(--font-figtree);
+
+  --radius-card: 22px;
+  --radius-frame: 16px;
+
+  --shadow-card: 0 8px 28px rgba(32, 29, 26, 0.12);
+  --shadow-float: 0 4px 12px rgba(32, 29, 26, 0.12);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html,
+body {
+  height: 100%;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-figtree), sans-serif;
+  overscroll-behavior: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* photo placeholder — diagonal stripes mark where a real product photo goes */
+.stripes {
+  background: repeating-linear-gradient(
+    45deg,
+    #e8e6dd 0 12px,
+    #f2f0e8 12px 24px
+  );
+}
+.stripes-light {
+  background: repeating-linear-gradient(
+    45deg,
+    #f0ebe2 0 12px,
+    #faf7f2 12px 24px
+  );
+}
+
+/* feed scroll-snap */
+.snap-feed {
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.snap-feed::-webkit-scrollbar {
+  display: none;
+}
+
+/* skeleton pulse — sand blocks, never spinners */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
   }
 }
+.skeleton {
+  background: var(--color-sand);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* voice waveform */
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.wave-bar {
+  transform-origin: bottom;
+  animation: wave 1.1s ease-in-out infinite;
 }
