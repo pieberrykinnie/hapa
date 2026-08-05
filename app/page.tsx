@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/app-shell";
+import { LocalOnboardingApp } from "@/components/local-onboarding-app";
 
 export default function Home() {
-  return <AppShell />;
+  return <LocalOnboardingApp />;
 }

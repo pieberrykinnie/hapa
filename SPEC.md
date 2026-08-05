@@ -2,6 +2,10 @@
 
 **The AI DJ for Shopping.** HAPA is an authenticated, voice-steerable shopping feed that learns a shopper's vibe from an optional profile photo plus five explicit “This you?” decisions. When the shopper taps **Buy Now**, an AI agent prepares a supported checkout, resolves missing details, shows the exact order, and waits for both shopper confirmation and payment-provider authorization.
 
+> **Local prototype override (2026-08-05):** The current onboarding build is intentionally device-local and uses browser `localStorage` instead of Supabase. It does not provide real authentication, cross-device persistence, private cloud storage, or connected payment methods. The production architecture below remains the target for any release that handles real accounts, uploaded media, or payments.
+
+The local prototype intentionally fakes photo personalization without inference: it normalizes each local image filename, matches allow-listed shopping keywords, and selects a curated five-card deck. One concept fills all five cards; multiple recognized concepts are interleaved so each appears before any concept repeats. For example, `jeans.jpg` plus `shirts.jpg` produces a balanced 3/2 denim-and-shirts mix with relevant imagery. For the current jeans demo, an unrecognized uploaded filename defaults to denim; only the no-photo path uses the generic deck. Image bytes stay on-device and no model is downloaded.
+
 This document is the implementation source of truth. The stakeholder requirements live in `specs/001-voice-shopping-feed/spec.md`; this file defines how the current product is built. Shared contracts live in §4, persistence in §5, and server boundaries in §6–§8. Any workstream that changes those contracts updates these sections first.
 
 ---
@@ -665,10 +669,10 @@ Persist the accepted shift with provenance before returning. The client may appl
 
 ### 10.2 Profile setup
 
-- Required name field.
-- Optional circular photo drop/tap area with camera/library picker on mobile.
-- Copy: “Optional. We use visible style cues—not identity or sensitive traits—to suggest your starting vibe.”
-- Preview, Replace, Remove, Continue without photo.
+- Required name field under **Make HAPA yours.** with the prompt **What should we call you?**
+- Optional large image drop zone with camera/library picker on mobile, a hero preview, and a thumbnail strip supporting up to five references.
+- Prompt: **Show us your taste · optional** and **Add up to five screenshots or photos you love.**
+- Preview, add, and remove controls; privacy line: **Analyzed on this device. Never uploaded.** in local prototype mode.
 - Consent checkbox is required only when a photo is submitted and links to the photo processing/deletion explanation.
 - Upload progress is visible. Analysis lasts at most five seconds before generic fallback.
 

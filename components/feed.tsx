@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { galleryFor } from "@/lib/gallery";
+import { resetLocalOnboarding } from "@/lib/onboarding/local-store";
 import type { Product } from "@/lib/types";
 import { AddVibeRadial, type AddVibeMode } from "./add-vibe-radial";
 import { useHapa } from "./hapa-provider";
@@ -186,6 +187,16 @@ export function Feed({
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => {
+              resetLocalOnboarding();
+              window.location.reload();
+            }}
+            className="ml-auto whitespace-nowrap rounded-full border border-line bg-card px-4 py-2 text-[13px] font-semibold text-ink-soft"
+          >
+            Replay onboarding
+          </button>
         </div>
         <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-r from-transparent to-paper" />
       </motion.div>
