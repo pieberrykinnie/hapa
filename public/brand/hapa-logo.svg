@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 320" role="img" aria-labelledby="title desc">
+  <title id="title">HAPA primary logo</title>
+  <desc id="desc">A minimal shopping cart whose tiled basket represents a digital mall, paired with a clean geometric HAPA wordmark.</desc>
+
+  <!-- Palette: canvas #F7F5EE, ink #14080E, green #3F7D20, lime #DDFCAD -->
+  <g id="digital-mall-mark">
+    <rect x="40" y="40" width="240" height="240" rx="48" fill="#14080E"/>
+
+    <!-- Cart + four storefront tiles: one cart, many shops. -->
+    <path d="M76 91h21l18 89h96l19-66H105"
+          fill="none" stroke="#F7F5EE" stroke-width="15"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="119" y="127" width="35" height="22" rx="7" fill="#DDFCAD"/>
+    <rect x="164" y="127" width="45" height="22" rx="7" fill="#3F7D20"/>
+    <rect x="124" y="155" width="39" height="18" rx="6" fill="#3F7D20"/>
+    <rect x="173" y="155" width="28" height="18" rx="6" fill="#DDFCAD"/>
+    <circle cx="132" cy="211" r="11" fill="#DDFCAD"/>
+    <circle cx="198" cy="211" r="11" fill="#DDFCAD"/>
+  </g>
+
+  <!-- Custom single-weight wordmark; fully vector, with no font dependency. -->
+  <g id="wordmark" fill="none" stroke="#14080E" stroke-width="24"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M360 102v116M444 102v116M360 160h84"/>
+    <path d="M510 218v-66c0-34 19-52 49-52s49 18 49 52v66M510 166h98"/>
+    <path d="M674 218V102h50c29 0 47 16 47 40s-18 40-47 40h-50"/>
+    <path d="M837 218v-66c0-34 19-52 49-52s49 18 49 52v66M837 166h98"/>
+  </g>
+</svg>
