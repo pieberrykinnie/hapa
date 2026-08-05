@@ -10,6 +10,12 @@ export interface Product {
   link: string; // real merchant URL — the agent's target
   tags: string[];
   description: string;
+  // Opaque key for fetching this product's full photo set from
+  // /api/products/gallery — set only for SerpApi-sourced products, fetched
+  // lazily when the shopper opens the detail page, never eagerly for a
+  // whole feed page. Null for curated catalogue items, which have no
+  // second image source.
+  galleryToken: string | null;
 }
 
 export interface FeedResponse {

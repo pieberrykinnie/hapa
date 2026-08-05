@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { galleryFor } from "@/lib/gallery";
 import type { Product } from "@/lib/types";
 import { useHapa } from "./hapa-provider";
@@ -11,6 +12,36 @@ import {
   DeliveryIcon,
 } from "./icons";
 import { ProductPhoto } from "./product-photo";
+
+interface GallerySlot {
+  key: string;
+  image: string;
+  caption: string;
+}
+
+// The hero slide always keeps this same key, loaded or not, so the extra
+// photos arriving doesn't unmount/remount the thumbnail already on screen —
+// that swap-in-place was the source of the jump. New slides get their own
+// keys and fade in after it instead of the whole rail popping in at once.
+function heroSlot(product: Product): GallerySlot {
+  return { key: `${product.id}-hero`, image: product.image, caption: product.title };
+}
+
+function buildSlots(product: Product, fullGallery: string[] | null): GallerySlot[] {
+  if (fullGallery) {
+    return [
+      heroSlot(product),
+      ...fullGallery.map((image, i) => ({
+        key: `${product.id}-full-${i}`,
+        image,
+        caption: product.title,
+      })),
+    ];
+  }
+  // No live gallery yet (or none exists) — one real photo, or the curated
+  // catalogue's placeholder frames.
+  return product.image ? [heroSlot(product)] : galleryFor(product);
+}
 
 export function ProductPage({
   product,
@@ -33,10 +64,50 @@ export function ProductPage({
   const fitTags = product.tags
     .filter((tag) => !["for-you", "fashion", "shopping", "style"].includes(tag))
     .slice(0, 3);
-  // A real photo (SerpApi thumbnail or curated image) is exactly one frame,
-  // not four — the old hardcoded minimum implied a swipeable gallery that
-  // was never actually there. This matches the feed card's own frame count.
-  const galleryCount = galleryFor(product).length;
+
+  const [fullGallery, setFullGallery] = useState<string[] | null>(null);
+  // This component remounts fresh per product (see app-shell.tsx's
+  // key={layoutKey}), so "is there a token to fetch" is known at mount —
+  // no need to flip this on inside the effect, which is what the lint rule
+  // below is warning about (a synchronous setState mid-effect).
+  const [galleryLoading, setGalleryLoading] = useState(() => Boolean(product.galleryToken));
+  const railRef = useRef<HTMLDivElement>(null);
+  const [frame, setFrame] = useState(0);
+
+  // The feed only ever hands over one real photo per live product — its
+  // full photo set lives behind a second, billed SerpApi call, so it's
+  // fetched here, lazily, only for the specific product the shopper opened
+  // (never eagerly for a whole feed page). Falls back to the one thumbnail
+  // already showing on any failure.
+  useEffect(() => {
+    if (!product.galleryToken) return;
+    let cancelled = false;
+    fetch(`/api/products/gallery?token=${encodeURIComponent(product.galleryToken)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { images?: string[] } | null) => {
+        if (!cancelled && data?.images && data.images.length > 0) {
+          setFullGallery(data.images);
+        }
+      })
+      .catch(() => {
+        // stay on the one thumbnail already showing
+      })
+      .finally(() => {
+        if (!cancelled) setGalleryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [product.galleryToken]);
+
+  const slots = buildSlots(product, fullGallery);
+
+  const onRailScroll = () => {
+    const el = railRef.current;
+    if (!el) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    if (i !== frame) setFrame(i);
+  };
 
   return (
     <motion.div
@@ -52,10 +123,26 @@ export function ProductPage({
         transition={{ type: "spring", damping: 34, stiffness: 460 }}
         className="relative h-[min(52dvh,420px)] shrink-0 overflow-hidden bg-sand"
       >
-        <ProductPhoto
-          image={product.image}
-          caption={`${product.title} — full-bleed photo`}
-        />
+        <div
+          ref={railRef}
+          onScroll={onRailScroll}
+          className="flex h-full w-full snap-x snap-mandatory overflow-x-auto"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {slots.map((slot, i) => (
+            <motion.div
+              key={slot.key}
+              // Only slides added after the first render fade in — the hero
+              // slide is already visible and should never flash.
+              initial={i === 0 ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, delay: i === 0 ? 0 : 0.04 * i }}
+              className="h-full w-full shrink-0 snap-center"
+            >
+              <ProductPhoto image={slot.image} caption={slot.caption} />
+            </motion.div>
+          ))}
+        </div>
         <button
           type="button"
           aria-label="Back to feed"
@@ -79,18 +166,49 @@ export function ProductPage({
             color={saved ? "#3f7d20" : "#14080e"}
           />
         </button>
-        {galleryCount > 1 && (
-          <div className="absolute inset-x-0 bottom-3.5 flex justify-center gap-[5px]">
-            {Array.from({ length: galleryCount }).map((_, i) => (
-              <span
-                key={i}
-                className={`h-[5px] rounded-[3px] ${
-                  i === 0 ? "w-4 bg-ink" : "w-[5px] bg-ink/30"
-                }`}
-              />
-            ))}
-          </div>
-        )}
+        {/* one slot for either state, crossfading rather than waiting for
+            the loading hint to fully exit before the dots enter — a
+            sequential wait would depend on that exit animation's frame
+            callback firing, which a backgrounded tab can stall indefinitely */}
+        <AnimatePresence>
+          {galleryLoading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="pointer-events-none absolute inset-x-0 bottom-3.5 flex justify-center"
+            >
+              <span className="flex items-center gap-1.5 rounded-full bg-white/94 px-3 py-1.5">
+                <span className="skeleton size-1.5 rounded-full" />
+                <span className="text-[11px] font-medium text-ink-soft">
+                  Loading more photos…
+                </span>
+              </span>
+            </motion.div>
+          ) : (
+            slots.length > 1 && (
+              <motion.div
+                key="dots"
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="pointer-events-none absolute inset-x-0 bottom-3.5 flex justify-center gap-[5px]"
+              >
+                {slots.map((slot, i) => (
+                  <span
+                    key={slot.key}
+                    className={`h-[5px] rounded-[3px] transition-all duration-150 ${
+                      i === frame ? "w-4 bg-ink" : "w-[5px] bg-ink/30"
+                    }`}
+                  />
+                ))}
+              </motion.div>
+            )
+          )}
+        </AnimatePresence>
       </motion.div>
 
       <div className="flex flex-1 flex-col overflow-y-auto px-6 pt-5">

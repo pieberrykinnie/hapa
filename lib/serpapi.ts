@@ -31,10 +31,22 @@ interface SerpApiShoppingResult {
   delivery?: string;
   snippet?: string;
   extensions?: string[];
+  // Opaque key for the separate google_immersive_product lookup that
+  // returns this item's full photo set. The google_product engine (which
+  // took a stable product_id) was deprecated by Google, so this ephemeral
+  // token — regenerated on every search — is the only working path to more
+  // than the one search-result thumbnail. Confirmed against the live API:
+  // a single tent listing's thumbnail expands to 10 real photos through it.
+  immersive_product_page_token?: string;
 }
 
 interface SerpApiShoppingResponse {
   shopping_results?: SerpApiShoppingResult[];
+  error?: string;
+}
+
+interface SerpApiImmersiveProductResponse {
+  product_results?: { thumbnails?: string[] };
   error?: string;
 }
 
@@ -256,7 +268,48 @@ function toProduct(result: SerpApiShoppingResult, tags: string[]): Product | nul
     link,
     tags,
     description,
+    galleryToken: result.immersive_product_page_token ?? null,
   };
+}
+
+/**
+ * Fetches a live product's full photo set. Only ever called on demand, when
+ * the shopper opens that specific product's detail page — never eagerly for
+ * a whole feed page, since each call costs a separate SerpApi credit and
+ * most scrolled-past products are never opened. Empty array on any failure
+ * (no key, forced fallback, timeout, malformed response): the caller keeps
+ * showing the one thumbnail it already has.
+ */
+export async function fetchProductGallery(pageToken: string): Promise<string[]> {
+  const apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey || process.env.FORCE_FALLBACK === "1" || !pageToken) return [];
+
+  const params = new URLSearchParams({
+    engine: "google_immersive_product",
+    page_token: pageToken,
+    api_key: apiKey,
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${SERPAPI_URL}?${params}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as SerpApiImmersiveProductResponse;
+    if (data.error) return [];
+
+    const thumbnails = data.product_results?.thumbnails;
+    return Array.isArray(thumbnails) ? thumbnails.filter((url) => typeof url === "string") : [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // Bilingual CA listings sometimes render an exclusion under its French name
