@@ -58,6 +58,7 @@ interface HapaContextValue {
   items: Product[];
   activeCategory: string;
   status: "idle" | "loading" | "shifting";
+  loadingMore: boolean;
   toast: string | null;
   setName: (name: string) => void;
   addVibeImages: (files: File[]) => void;
@@ -119,6 +120,10 @@ export function HapaProvider({ children }: { children: ReactNode }) {
   const [activeCategory, setActiveCategory] = useState("for-you");
   const [status, setStatus] = useState<"idle" | "loading" | "shifting">("idle");
   const [toast, setToast] = useState<string | null>(null);
+  // Pagination doesn't touch `status` (a full skeleton flash on every
+  // infinite-scroll page would be worse than just appending quietly), but
+  // the end of the list still needs its own loading affordance.
+  const [loadingMore, setLoadingMore] = useState(false);
   const cursorRef = useRef<number | null>(0);
   const fetchIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
@@ -183,7 +188,10 @@ const retryTimer = window.setTimeout(() => {
           opts.restoreOnFailure.forEach((item) => seenRef.current.add(item.id));
         }
       } finally {
-        if (!opts.replace) loadingMoreRef.current = false;
+        if (!opts.replace) {
+          loadingMoreRef.current = false;
+          setLoadingMore(false);
+        }
         if (fetchId === fetchIdRef.current) setStatus("idle");
       }
     },
@@ -351,6 +359,7 @@ const retryTimer = window.setTimeout(() => {
     if (status !== "idle" || cursorRef.current === null || loadingMoreRef.current)
       return;
     loadingMoreRef.current = true;
+    setLoadingMore(true);
     fetchFeed({
       dna,
       category: activeCategory,
@@ -389,7 +398,11 @@ const retryTimer = window.setTimeout(() => {
         saveJSON(DNA_STORAGE_KEY, next);
         const more = shift.add_keywords.join(" & ");
         const less = [...shift.dealbreakers, ...shift.remove_keywords].join(" & ");
-        setToast(`Updating your feed: more ${more} · less ${less}`);
+        setToast(
+          less
+            ? `Updating your feed: more ${more} · less ${less}`
+            : `Updating your feed: more ${more}`,
+        );
         setActiveCategory("for-you");
         setStatus("shifting");
         const restoreOnFailure = itemsRef.current;
@@ -482,6 +495,7 @@ const retryTimer = window.setTimeout(() => {
       items,
       activeCategory,
       status,
+      loadingMore,
       toast,
       setName,
       addVibeImages,
@@ -509,6 +523,7 @@ const retryTimer = window.setTimeout(() => {
       items,
       activeCategory,
       status,
+      loadingMore,
       toast,
       setName,
       addVibeImages,

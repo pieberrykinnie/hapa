@@ -39,6 +39,7 @@ export function Feed({
     saved,
     activeCategory,
     status,
+    loadingMore,
     toast,
     setCategory,
     loadMore,
@@ -119,7 +120,10 @@ export function Feed({
     };
   }, []);
 
-  const showSkeletons = list.length === 0 && status !== "idle";
+  // A vibe change (voice/text/photo) gets its own spinner, distinct from the
+  // skeleton blocks used for a plain category switch or the very first load.
+  const showShiftingSpinner = list.length === 0 && status === "shifting";
+  const showSkeletons = list.length === 0 && status === "loading";
 
   // Held across renders so toggling the chip bar mid-scroll doesn't re-render
   // every mounted card (each carries a `layoutId` element framer re-measures).
@@ -220,7 +224,11 @@ export function Feed({
         className="snap-feed flex-1 overflow-y-auto px-4"
         style={{ display: "flex", flexDirection: "column", gap: GAP }}
       >
-        {showSkeletons ? (
+        {showShiftingSpinner ? (
+          <div className="flex h-full flex-1 items-center justify-center">
+            <div className="spinner size-8" />
+          </div>
+        ) : showSkeletons ? (
           [0, 1].map((i) => (
             <div
               key={i}
@@ -240,6 +248,11 @@ export function Feed({
           </div>
         ) : (
           cards
+        )}
+        {loadingMore && !showingSaved && (
+          <div className="flex shrink-0 items-center justify-center py-6">
+            <div className="spinner size-6" />
+          </div>
         )}
         <div className="h-1 shrink-0" />
       </div>

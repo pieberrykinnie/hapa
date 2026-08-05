@@ -14,6 +14,9 @@ export function getVapiClient(): Vapi {
     const key = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
     if (!key) throw new Error("NEXT_PUBLIC_VAPI_PUBLIC_KEY is not set");
     client = new Vapi(key);
+    if (process.env.NODE_ENV !== "production") {
+      (window as unknown as { __hapaVapiDebug?: Vapi }).__hapaVapiDebug = client;
+    }
   }
   return client;
 }

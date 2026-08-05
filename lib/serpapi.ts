@@ -42,11 +42,12 @@ interface SerpApiShoppingResponse {
  * `dna.likes` appends new signals at the end (see `applyVibeShift` in
  * hapa-provider.tsx) — the shopper's most recent request, e.g. what they
  * just said by voice, is the *tail* of the array, not the head. Taking the
- * front would mean a fresh voice request never reaches the actual search
- * query once a shopper has accumulated more than a few likes.
+ * last N and reversing them prepends the newest term to the front of the
+ * built query string, so it leads the search instead of trailing behind
+ * older, less relevant likes.
  */
 function mostRecent(keywords: string[], n: number): string[] {
-  return keywords.slice(-n);
+  return keywords.slice(-n).reverse();
 }
 
 /**
