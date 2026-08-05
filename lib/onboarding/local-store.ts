@@ -149,9 +149,18 @@ export function parseLocalOnboarding(input: unknown): LocalOnboardingState {
   const styleProfile = isStyleProfile(value.styleProfile) ? value.styleProfile : null;
   const completedDecisions = suggestions.every((item) => decisions[item.id]);
   const requestedStage = isStage(value.stage) ? value.stage : "profile";
-  const stage = (requestedStage === "billing" || requestedStage === "complete") && (!completedDecisions || !styleProfile)
-    ? "this_you"
-    : requestedStage;
+
+  const preferredPaymentMethod = isPaymentMethod(value.preferredPaymentMethod)
+    ? value.preferredPaymentMethod
+    : null;
+  const billingDeferred = Boolean(value.billingDeferred);
+
+  const stage =
+    (requestedStage === "billing" || requestedStage === "complete") && (!completedDecisions || !styleProfile)
+      ? "this_you"
+      : requestedStage === "complete" && !preferredPaymentMethod && !billingDeferred
+        ? "billing"
+        : requestedStage;
 
   return {
     ...clean,
@@ -162,8 +171,8 @@ export function parseLocalOnboarding(input: unknown): LocalOnboardingState {
     suggestions,
     decisions,
     styleProfile,
-    preferredPaymentMethod: isPaymentMethod(value.preferredPaymentMethod) ? value.preferredPaymentMethod : null,
-    billingDeferred: Boolean(value.billingDeferred),
+    preferredPaymentMethod,
+    billingDeferred,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : clean.updatedAt,
   };
 }
