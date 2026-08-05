@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { galleryFor } from "@/lib/gallery";
 import type { Product } from "@/lib/types";
@@ -45,6 +45,7 @@ export function Feed({
     dismissToast,
   } = useHapa();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollFrameRef = useRef(0);
   const touchStartY = useRef<number | null>(null);
   const swiping = useRef(false);
   const [chipsHidden, setChipsHidden] = useState(false);
@@ -94,28 +95,67 @@ export function Feed({
     }
   };
 
+  // Scroll events fire far faster than paint; coalescing to one frame keeps the
+  // layout reads below (scrollHeight/clientHeight) from flushing style on every
+  // event, which is what turns a long feed's scroll into a stutter.
   const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setAddVibeOpen(false);
-    if (showingSaved) return; // saved list isn't paginated
-    // prefetch when ~3 cards from the end
-    const nearEnd =
-      el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 3;
-    if (nearEnd) loadMore();
+    if (scrollFrameRef.current) return;
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = 0;
+      const el = scrollRef.current;
+      if (!el) return;
+      setAddVibeOpen(false);
+      if (showingSaved) return; // saved list isn't paginated
+      // prefetch when ~3 cards from the end
+      const nearEnd =
+        el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 3;
+      if (nearEnd) loadMore();
+    });
   };
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+    };
+  }, []);
 
   const showSkeletons = list.length === 0 && status !== "idle";
 
+  // Held across renders so toggling the chip bar mid-scroll doesn't re-render
+  // every mounted card (each carries a `layoutId` element framer re-measures).
+  const cards = useMemo(
+    () =>
+      list.map((product, i) => (
+        <FeedCard
+          key={`${product.id}-${i}`}
+          // the looping feed repeats products, so the shared-element id
+          // must be unique per card instance, not per product
+          layoutKey={`photo-${product.id}-${i}`}
+          product={product}
+          onOpen={() => onOpenProduct(product, `photo-${product.id}-${i}`)}
+          onBuy={() => onBuy(product)}
+        />
+      )),
+    [list, onOpenProduct, onBuy],
+  );
+
   return (
     <div className="relative flex h-dvh flex-col bg-paper">
-      {/* category chips — collapse on scroll down, return on scroll up */}
+      {/* Category chips — duck out for the duration of a swipe (see the
+          pointer handlers above). They fade and lift rather than collapsing
+          their height: the bar sits above the snap scroller, so animating its
+          height resized the scroller — and every card, which is sized off it —
+          on every frame of the transition. A `y mandatory` scroller re-snaps
+          whenever it's resized, so that fought the gesture, worst on the
+          reveal, where the height animates back to "auto" and framer has to
+          re-measure the subtree each frame. */}
       <motion.div
         className="relative z-10 shrink-0 overflow-hidden pt-[calc(env(safe-area-inset-top)+10px)]"
         animate={{
-          height: chipsHidden ? 0 : "auto",
+          y: chipsHidden ? -10 : 0,
           opacity: chipsHidden ? 0 : 1,
         }}
+        style={{ pointerEvents: chipsHidden ? "none" : "auto" }}
         initial={false}
         transition={{ duration: 0.18, ease: "easeOut" }}
       >
@@ -199,17 +239,7 @@ export function Feed({
             </p>
           </div>
         ) : (
-          list.map((product, i) => (
-            <FeedCard
-              key={`${product.id}-${i}`}
-              // the looping feed repeats products, so the shared-element id
-              // must be unique per card instance, not per product
-              layoutKey={`photo-${product.id}-${i}`}
-              product={product}
-              onOpen={() => onOpenProduct(product, `photo-${product.id}-${i}`)}
-              onBuy={() => onBuy(product)}
-            />
-          ))
+          cards
         )}
         <div className="h-1 shrink-0" />
       </div>
