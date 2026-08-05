@@ -36,6 +36,7 @@ inputs:
     default: "auto"
     prompt: "Integration to use (e.g. claude, copilot, gemini; 'auto' uses the project's initialized integration)"
   scope:
+    # NOTE: Currently unused by workflow steps; reserved for future scope filtering.
     type: string
     default: "full"
     enum: ["full", "backend-only", "frontend-only"]
