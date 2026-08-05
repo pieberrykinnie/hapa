@@ -29,7 +29,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const keywords = parseList(searchParams.get("keywords"));
   const exclude = parseList(searchParams.get("exclude"));
-  const cursor = Number(searchParams.get("cursor") ?? 0) || 0;
+const cursor = Math.max(
+    0,
+    Math.floor(Number(searchParams.get("cursor") ?? 0) || 0),
+  );
   const seen = new Set(parseList(searchParams.get("seen")).slice(-MAX_SEEN));
 
   const live = await fetchLiveResults(keywords, exclude, seen, cursor, PAGE_SIZE);
