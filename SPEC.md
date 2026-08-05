@@ -172,7 +172,7 @@ export interface ShopperProfile {
   userId: string;
   name: string;
   photoPath: string | null;       // private storage path, never a permanent public URL
-  photoVersion: number;
+  photoVersion: number | null;    // null when no photo has been uploaded
   onboardingStage: OnboardingStage;
   style: StyleDNA;
   preferredPaymentMethod: PaymentMethodKind | null;
