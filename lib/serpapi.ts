@@ -236,6 +236,13 @@ function toProduct(result: SerpApiShoppingResult, tags: string[]): Product | nul
 
   const price = result.extracted_price ?? parsePrice(result.price);
   if (price === null) return null;
+  const description = Array.from(
+    new Set(
+      [result.delivery, ...(result.extensions ?? []), result.snippet].filter(
+        (value): value is string => Boolean(value?.trim()),
+      ),
+    ),
+  ).join(" · ");
 
   return {
     id: `serpapi-${hashSource(link)}`,
@@ -248,8 +255,7 @@ function toProduct(result: SerpApiShoppingResult, tags: string[]): Product | nul
     gallery: [],
     link,
     tags,
-    description:
-      result.snippet ?? result.extensions?.join(" · ") ?? result.delivery ?? "",
+    description,
   };
 }
 

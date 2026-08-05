@@ -106,10 +106,20 @@ input:focus-visible {
 /* feed scroll-snap */
 .snap-feed {
   scroll-snap-type: y mandatory;
+  scroll-padding-block: 0;
+  scroll-behavior: auto;
   scrollbar-width: none;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 .snap-feed::-webkit-scrollbar {
   display: none;
+}
+.feed-card {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  backface-visibility: hidden;
 }
 
 /* skeleton pulse — sand blocks, never spinners */
