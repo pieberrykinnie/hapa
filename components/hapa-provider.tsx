@@ -168,11 +168,12 @@ export function HapaProvider({ children }: { children: ReactNode }) {
         if (fetchId !== fetchIdRef.current) return;
         if (!opts.isRetry) {
           // one silent retry after 1.5s before giving up on this request
-          window.setTimeout(() => {
+const retryTimer = window.setTimeout(() => {
             if (fetchId === fetchIdRef.current) {
               fetchFeedRef.current({ ...opts, isRetry: true });
             }
           }, 1500);
+          agentTimersRef.current.push(retryTimer);
           return;
         }
         if (opts.restoreOnFailure && opts.restoreOnFailure.length > 0) {
