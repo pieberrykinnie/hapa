@@ -29,15 +29,22 @@ import type {
 const DNA_STORAGE_KEY = "hapa.dna";
 const BILLING_STORAGE_KEY = "hapa.billing";
 const SAVED_STORAGE_KEY = "hapa.saved";
+const PURCHASES_STORAGE_KEY = "hapa.purchases";
 
 const BILLING_LABELS: Record<BillingProvider, string> = {
   applepay: "Apple Pay",
   gpay: "Google Pay",
   paypal: "PayPal",
   affirm: "Affirm",
+  card: "Card",
 };
 
 export type Screen = "identity" | "swipe" | "billing" | "building" | "feed";
+
+export interface PurchaseRecord {
+  orderRef: string;
+  purchasedAt: string;
+}
 
 interface FetchFeedOpts {
   dna: StyleDNA;
@@ -54,6 +61,7 @@ interface HapaContextValue {
   vibeImages: VibeImage[];
   billing: BillingMethod | null;
   saved: Product[];
+  purchases: Record<string, PurchaseRecord>;
   order: Order | null;
   items: Product[];
   activeCategory: string;
@@ -69,6 +77,7 @@ interface HapaContextValue {
   setCategory: (category: string) => void;
   toggleSaved: (product: Product) => void;
   isSaved: (id: string) => boolean;
+  purchaseFor: (id: string) => PurchaseRecord | null;
   loadMore: () => void;
   applyVibeShift: (shift: VibeShift) => void;
   dismissToast: () => void;
@@ -109,12 +118,21 @@ function saveJSON(key: string, value: unknown) {
   }
 }
 
-export function HapaProvider({ children }: { children: ReactNode }) {
-  const [screen, setScreen] = useState<Screen>("identity");
-  const [dna, setDNA] = useState<StyleDNA>(EMPTY_DNA);
+export function HapaProvider({
+  children,
+  initialDNA,
+  initialBilling,
+}: {
+  children: ReactNode;
+  initialDNA?: StyleDNA;
+  initialBilling?: BillingMethod | null;
+}) {
+  const [screen, setScreen] = useState<Screen>(initialDNA ? "feed" : "identity");
+  const [dna, setDNA] = useState<StyleDNA>(initialDNA ?? EMPTY_DNA);
   const [vibeImages, setVibeImages] = useState<VibeImage[]>([]);
-  const [billing, setBilling] = useState<BillingMethod | null>(null);
+  const [billing, setBilling] = useState<BillingMethod | null>(initialBilling ?? null);
   const [saved, setSaved] = useState<Product[]>([]);
+  const [purchases, setPurchases] = useState<Record<string, PurchaseRecord>>({});
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState("for-you");
@@ -128,6 +146,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
   const fetchIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const agentTimersRef = useRef<number[]>([]);
+  const activeOrderRef = useRef<Order | null>(null);
   const itemsRef = useRef<Product[]>([]);
   // Every product ID shown so far in the current feed "lap" — sent back with
   // each request so neither live discovery nor the fallback loop repeats an
@@ -150,7 +169,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
       if (opts.replace) seenRef.current = new Set();
       const keywords =
         opts.category === "for-you" ? opts.dna.likes : [opts.category];
-const seenList = Array.from(seenRef.current).slice(-120);
+      const seenList = Array.from(seenRef.current).slice(-120);
       const params = new URLSearchParams({
         keywords: keywords.join(","),
         exclude: opts.dna.dealbreakers.join(","),
@@ -174,7 +193,7 @@ const seenList = Array.from(seenRef.current).slice(-120);
         if (fetchId !== fetchIdRef.current) return;
         if (!opts.isRetry) {
           // one silent retry after 1.5s before giving up on this request
-const retryTimer = window.setTimeout(() => {
+          const retryTimer = window.setTimeout(() => {
             if (fetchId === fetchIdRef.current) {
               fetchFeedRef.current({ ...opts, isRetry: true });
             }
@@ -202,38 +221,29 @@ const retryTimer = window.setTimeout(() => {
     fetchFeedRef.current = fetchFeed;
   }, [fetchFeed]);
 
-  // Persisted taste survives a reload mid-demo; ?onboard=1 forces a fresh run.
-  // Runs in an effect (not render) because localStorage doesn't exist during
-  // SSR and the server HTML must hydrate cleanly before we switch screens.
+  // Profile/style state comes from the device-local onboarding coordinator.
+  // Saved product presentation state remains a local convenience.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("onboard")) {
-      localStorage.removeItem(DNA_STORAGE_KEY);
-      localStorage.removeItem(BILLING_STORAGE_KEY);
-      localStorage.removeItem(SAVED_STORAGE_KEY);
-      return;
-    }
-    const storedDNA = loadJSON<StyleDNA>(DNA_STORAGE_KEY);
-    const storedBilling = loadJSON<BillingMethod>(BILLING_STORAGE_KEY);
     const storedSaved = loadJSON<Product[]>(SAVED_STORAGE_KEY);
+    const storedPurchases = loadJSON<Record<string, PurchaseRecord>>(
+      PURCHASES_STORAGE_KEY,
+    );
     /* Hydrating persisted state is exactly the "sync from an external system"
        case an effect is for — localStorage can't be read during SSR render. */
     /* eslint-disable react-hooks/set-state-in-effect */
     if (storedSaved) setSaved(storedSaved);
-    if (storedBilling) setBilling(storedBilling);
-    if (storedDNA && storedDNA.likes.length > 0 && storedBilling) {
-      setDNA({ ...EMPTY_DNA, ...storedDNA });
-      setScreen("feed");
+    if (storedPurchases) setPurchases(storedPurchases);
+    if (initialDNA) {
       setStatus("loading");
       fetchFeed({
-        dna: storedDNA,
+        dna: initialDNA,
         category: "for-you",
         cursor: 0,
         replace: true,
       });
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [fetchFeed]);
+  }, [fetchFeed, initialDNA]);
 
   // object URLs are revoked on unmount so uploads don't leak
   useEffect(() => {
@@ -427,18 +437,21 @@ const retryTimer = window.setTimeout(() => {
   // Buy now never pays directly — it opens a confirm step first, so a stray
   // tap on a scrolling feed can't spend money.
   const requestPurchase = useCallback((product: Product) => {
-    setOrder({
+    const next: Order = {
       product,
       stage: "confirm",
       steps: [],
       orderRef: null,
       error: null,
-    });
+    };
+    activeOrderRef.current = next;
+    setOrder(next);
   }, []);
 
   const cancelPurchase = useCallback(() => {
     agentTimersRef.current.forEach((t) => window.clearTimeout(t));
     agentTimersRef.current = [];
+    activeOrderRef.current = null;
     setOrder(null);
   }, []);
 
@@ -450,39 +463,65 @@ const retryTimer = window.setTimeout(() => {
       agentTimersRef.current.forEach((t) => window.clearTimeout(t));
       agentTimersRef.current = labels.map((_, i) =>
         window.setTimeout(
-          () =>
-            setOrder((o) =>
-              o && o.stage === "working"
-                ? {
-                    ...o,
-                    steps: o.steps.map((s, si) =>
-                      si <= i ? { ...s, done: true } : s,
-                    ),
-                  }
-                : o,
-            ),
+          () => {
+            const active = activeOrderRef.current;
+            if (!active || active.stage !== "working") return;
+            const next: Order = {
+              ...active,
+              steps: active.steps.map((s, si) =>
+                si <= i ? { ...s, done: true } : s,
+              ),
+            };
+            activeOrderRef.current = next;
+            setOrder(next);
+          },
           STEP_MS * (i + 1),
         ),
       );
       agentTimersRef.current.push(
         window.setTimeout(
-          () =>
-            setOrder((o) =>
-              o && o.stage === "working"
-                ? { ...o, stage: "done", orderRef: makeOrderRef() }
-                : o,
-            ),
+          () => {
+            const active = activeOrderRef.current;
+            if (!active || active.stage !== "working") return;
+            const orderRef = makeOrderRef();
+            const doneOrder: Order = {
+              ...active,
+              stage: "done",
+              orderRef,
+              steps: active.steps.map((step) => ({ ...step, done: true })),
+            };
+            activeOrderRef.current = doneOrder;
+            setOrder(doneOrder);
+            setPurchases((current) => {
+              const next = {
+                ...current,
+                [active.product.id]: {
+                  orderRef,
+                  purchasedAt: new Date().toISOString(),
+                },
+              };
+              saveJSON(PURCHASES_STORAGE_KEY, next);
+              return next;
+            });
+          },
           STEP_MS * (labels.length + 0.6),
         ),
       );
 
-      return {
+      const workingOrder: Order = {
         ...prev,
         stage: "working",
         steps: labels.map((label) => ({ label, done: false })),
       };
+      activeOrderRef.current = workingOrder;
+      return workingOrder;
     });
   }, [billing]);
+
+  const purchaseFor = useCallback(
+    (id: string) => purchases[id] ?? null,
+    [purchases],
+  );
 
   const value = useMemo<HapaContextValue>(
     () => ({
@@ -491,6 +530,7 @@ const retryTimer = window.setTimeout(() => {
       vibeImages,
       billing,
       saved,
+      purchases,
       order,
       items,
       activeCategory,
@@ -506,6 +546,7 @@ const retryTimer = window.setTimeout(() => {
       setCategory,
       toggleSaved,
       isSaved,
+      purchaseFor,
       loadMore,
       applyVibeShift,
       dismissToast,
@@ -519,6 +560,7 @@ const retryTimer = window.setTimeout(() => {
       vibeImages,
       billing,
       saved,
+      purchases,
       order,
       items,
       activeCategory,
@@ -534,6 +576,7 @@ const retryTimer = window.setTimeout(() => {
       setCategory,
       toggleSaved,
       isSaved,
+      purchaseFor,
       loadMore,
       applyVibeShift,
       dismissToast,

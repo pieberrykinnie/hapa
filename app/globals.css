@@ -27,6 +27,7 @@
 
   --font-display: var(--font-manrope);
   --font-sans: var(--font-manrope);
+  --font-mono: var(--font-manrope);
 
   --radius-card: 22px;
   --radius-frame: 16px;
@@ -42,6 +43,48 @@ body {
   color: var(--color-ink);
   font-family: var(--font-manrope), sans-serif;
   overscroll-behavior: none;
+}
+
+.hapa-wordmark {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.075em;
+  line-height: 1;
+}
+
+button,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-pine) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.vibe-art {
+  background-color: #d9d4c9;
+  background-image:
+    radial-gradient(circle at 72% 28%, rgba(250, 247, 242, 0.8) 0 10%, transparent 11%),
+    linear-gradient(135deg, rgba(61, 107, 79, 0.82), rgba(240, 235, 226, 0.3));
+}
+
+.vibe-art-streetwear,
+.vibe-art-generated-0-streetwear {
+  background-image: linear-gradient(145deg, #1f2522 0 35%, #839487 35% 52%, #ede4d5 52%);
+}
+.vibe-art-minimal-home {
+  background-image: linear-gradient(160deg, #f0ebe2 0 58%, #b9a98e 58% 65%, #506756 65%);
+}
+.vibe-art-color-pop {
+  background-image: radial-gradient(circle at 66% 38%, #e86f52 0 18%, transparent 19%), linear-gradient(135deg, #f3c85b, #648ba7);
+}
+.vibe-art-vintage {
+  background-image: linear-gradient(120deg, #5a3826 0 38%, #a66d3c 38% 62%, #c7a96e 62% 68%, #32463a 68%);
+}
+.vibe-art-outdoors {
+  background-image: linear-gradient(165deg, #9db4b1 0 40%, #718b68 40% 58%, #4d684c 58% 74%, #9a7552 74%);
 }
 
 /* photo placeholder — diagonal stripes mark where a real product photo goes */
@@ -63,10 +106,20 @@ body {
 /* feed scroll-snap */
 .snap-feed {
   scroll-snap-type: y mandatory;
+  scroll-padding-block: 0;
+  scroll-behavior: auto;
   scrollbar-width: none;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 .snap-feed::-webkit-scrollbar {
   display: none;
+}
+.feed-card {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  backface-visibility: hidden;
 }
 
 /* skeleton pulse — sand blocks, never spinners */

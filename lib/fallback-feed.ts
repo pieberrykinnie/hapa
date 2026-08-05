@@ -26,6 +26,7 @@ const p = (
   link,
   tags,
   description,
+  galleryToken: null,
 });
 
 export const FALLBACK_FEED: Product[] = [

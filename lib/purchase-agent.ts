@@ -12,12 +12,12 @@ import type { BillingMethod, Product } from "./types";
 export function buildSteps(product: Product, billing: BillingMethod): string[] {
   return [
     `Opening ${product.merchant}`,
-    `Finding "${product.title}"`,
-    "Adding to cart",
-    "Declining the newsletter, politely",
-    "Filling in your shipping details",
-    `Paying with ${billing.label}`,
-    "Grabbing your receipt",
+    "Checking price and availability",
+    "Adding your item to cart",
+    "Skipping optional offers",
+    "Confirming delivery details",
+    `Authorizing ${billing.label}`,
+    "Saving your receipt",
   ];
 }
 

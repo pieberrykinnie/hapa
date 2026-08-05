@@ -1,6 +1,6 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 -> 2.0.0
+- Version change: 2.0.0 -> 2.1.0
 - Modified principles:
   - I. The Demo Is the Product -> expanded to cover authenticated onboarding and checkout
   - II. Every Network Path Has a Fallback -> financial and authentication paths now fail closed
@@ -12,7 +12,8 @@ Sync Impact Report
   - VII. Profile Photos Are Private Inputs
 - Added sections: Identity, Media, and Commerce Constraints
 - Removed sections: none
-- Follow-up TODOs: none
+- Added section: Local Prototype Exception
+- Follow-up TODOs: restore authenticated storage before production or multi-device testing
 -->
 # HAPA Constitution
 
@@ -89,6 +90,21 @@ derived style signals, onboarding progress, and order history MUST use authentic
 Small non-authoritative UI preferences MAY be cached locally, but local state MUST NOT be the
 source of truth for identity, payment status, or orders.
 
+### Local Prototype Exception
+
+When the active feature spec explicitly declares **Prototype Mode**, onboarding MAY use browser
+`localStorage` as its only persistence layer to remove infrastructure requirements. In this mode:
+
+- the UI MUST say that data stays on this device and MUST NOT call the experience authenticated;
+- photo data MUST remain in the browser, be removable, and never be sent to a server;
+- payment choices are preferences only and MUST NOT be labeled connected or available;
+- clearing browser storage resets onboarding, and cross-device/session ownership is unsupported;
+- real checkout, orders, or payment submission MUST remain disabled until authenticated storage
+  and provider verification are restored.
+
+This exception is a delivery-stage constraint, not approval to ship personal or financial data
+handling without the account-backed controls elsewhere in this constitution.
+
 ## Identity, Media, and Commerce Constraints
 
 - Authentication MUST use a maintained provider and secure server-validated sessions.
@@ -128,4 +144,4 @@ Compliance with the current constitution MUST be reviewed during planning and be
 Spec Kit artifacts under `specs/` supplement `SPEC.md`; they do not replace it until an explicit
 migration says so.
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-05 | **Last Amended**: 2026-08-05
+**Version**: 2.1.0 | **Ratified**: 2026-08-05 | **Last Amended**: 2026-08-05

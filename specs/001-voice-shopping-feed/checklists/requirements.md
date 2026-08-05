@@ -37,3 +37,5 @@
 - Payment-method availability is explicitly contextual rather than guaranteed.
 - Arbitrary external merchant automation is outside scope; unsupported products use a labeled handoff.
 - No clarification marker remains because safety-preserving defaults and boundaries are recorded in Assumptions and Scope Boundaries.
+- Prototype matching now uses deterministic allow-listed filename keywords; jean/denim and unknown uploaded filenames use the jeans demo deck, while no photo uses the generic deck.
+- Multiple recognized filenames are balanced across the five-card deck; jeans plus shirts yields a 3/2 concept mix.
