@@ -1,8 +1,8 @@
-# Aura — Implementation Spec
+# HAPA — Implementation Spec
 
 **The AI DJ for Shopping.** A voice-steerable, infinite shopping feed that learns your style from 5 swipes and pivots the entire feed when you talk to it.
 
-This document is the single source of truth for implementation. It is written to be split across ~5 parallel agents (see §12 Workstreams). Every cross-workstream contract lives in §3 (Types) and §5 (API). **Nobody changes a file outside their workstream without updating §3/§5 first.**
+This document is the single source of truth for implementation. It is written to be split across ~5 parallel agents (see §11 Workstreams). Every cross-workstream contract lives in §3 (Types) and §5 (API). **Nobody changes a file outside their workstream without updating §3/§5 first.**
 
 ---
 
@@ -14,18 +14,18 @@ This document is the single source of truth for implementation. It is written to
 | Package manager | **pnpm** (`packageManager: pnpm@11.2.2`) | Lockfile present. Do not run `npm install` — it created a stray `package-lock.json`; delete it. |
 | Styling | Tailwind CSS v4 (`@import "tailwindcss"` in `app/globals.css`) | Already configured via `@tailwindcss/postcss`. No `tailwind.config.js` — use `@theme` in CSS. |
 | Animation | **`motion`** (`pnpm add motion`), import from `motion/react` | Framer Motion's current package name. `framer-motion` is the legacy alias. |
-| PWA | **Native `app/manifest.ts`** + `apple-mobile-web-app-capable` meta | Do **not** use `next-pwa` — it does not support Next 16 and will break the build. Offline caching is out of scope; we only need standalone display + installability. |
+| PWA | **Native `app/manifest.ts`** + `apple-mobile-web-app-capable` meta | Do **not** use `next-pwa` — it does not support Next 16 and will break the build. Installability + standalone display only; no offline caching, no push. |
 | Voice | `@vapi-ai/web` (client-side only) | Runs in browser, needs mic permission. |
 | Product data | SerpApi `google_shopping` engine, server-side only | API key must never reach the client. |
 | "ML model" | JSON `StyleDNA` in React Context + an LLM query-synthesis call | No training. LLM turns StyleDNA → search query. |
-| LLM | Anthropic `claude-opus-5` via `@anthropic-ai/sdk`, structured outputs | Deterministic JSON out. Optional — there is a rules-based fallback (§5.4) so the demo works with zero LLM keys. |
-| Push | OneSignal Web SDK v16 + a manual trigger route | iOS 16.4+ requires the PWA be installed to the home screen. |
+| LLM | **Groq**, `openai/gpt-oss-20b`, via `groq-sdk` | Free/cheap tier, ~1000 tok/s, and it's one of the two Groq models supporting **strict** JSON-schema structured outputs. Optional — a rules-based fallback (§5.4) means the demo runs with zero LLM keys. |
+| Push notifications | **Cut.** | Dropped from scope per PR review. No OneSignal, no service worker, no `/api/notify`. |
 | Persistence | `localStorage` only | No DB. Hackathon scope. |
 | Deploy | Vercel | Set env vars in project settings. |
 
 ### Non-negotiable demo-survival rules
 1. **Every network path has a fallback.** SerpApi down/rate-limited/slow → serve `fallback_feed.json`. LLM down → rules-based query builder. Vapi down → a text-input "cheat" bar behind `?debug=1`.
-2. **No route handler may take >8s.** Hard `AbortController` timeouts on all outbound fetches (SerpApi 6s, Anthropic 8s).
+2. **No route handler may take >8s.** Hard `AbortController` timeouts on all outbound fetches (SerpApi 6s, Groq 5s).
 3. **The feed never renders empty.** If a fetch returns 0 items, keep the previous items and toast an error.
 
 ---
@@ -35,14 +35,13 @@ This document is the single source of truth for implementation. It is written to
 ```
 hapa/
 ├── app/
-│   ├── layout.tsx                 # root layout; providers; PWA meta; OneSignal script  [WS-A]
+│   ├── layout.tsx                 # root layout; providers; PWA meta                    [WS-A]
 │   ├── globals.css                # Tailwind v4 + @theme tokens + safe-area vars        [WS-A]
 │   ├── manifest.ts                # MetadataRoute.Manifest                              [WS-A]
 │   ├── page.tsx                   # entry: routes to Onboarding or Feed by profile state[WS-A]
 │   └── api/
 │       ├── feed/route.ts          # POST → ProductCard[]                                [WS-E]
-│       ├── vibe/route.ts          # POST → StyleDNA patch (LLM query synthesis)         [WS-E]
-│       └── notify/route.ts        # POST → OneSignal push (demo trigger)                [WS-F]
+│       └── vibe/route.ts          # POST → StyleDNA patch (LLM query synthesis)         [WS-E]
 ├── components/
 │   ├── onboarding/
 │   │   ├── SwipeDeck.tsx          # the 5-card Tinder stack                             [WS-B]
@@ -70,8 +69,7 @@ hapa/
 │   └── fallback_feed.json         # ≥30 pre-tagged products                             [WS-E]
 ├── public/
 │   ├── icon-192.png, icon-512.png, apple-touch-icon.png                                 [WS-A]
-│   ├── seed/*.jpg                 # 5 onboarding images (or remote URLs)                [WS-B]
-│   └── OneSignalSDKWorker.js      # must be at origin root, content-type js             [WS-F]
+│   └── seed/*.jpg                 # 5 onboarding images                                 [WS-B]
 ├── .env.local.example                                                                    [WS-E]
 └── SPEC.md
 ```
@@ -175,7 +173,7 @@ export const EMPTY_DNA: StyleDNA = {
 };
 
 export function applyShift(dna: StyleDNA, shift: VibeShift): StyleDNA
-export function loadProfile(): StyleDNA | null      // localStorage 'aura.profile.v1'
+export function loadProfile(): StyleDNA | null      // localStorage 'hapa.profile.v1'
 export function saveProfile(dna: StyleDNA): void
 export function clearProfile(): void
 ```
@@ -219,10 +217,7 @@ Read `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md
 import 'server-only';
 export const env = {
   SERPAPI_KEY: process.env.SERPAPI_KEY ?? '',
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
-  ONESIGNAL_APP_ID: process.env.ONESIGNAL_APP_ID ?? '',
-  ONESIGNAL_REST_API_KEY: process.env.ONESIGNAL_REST_API_KEY ?? '',
-  DEMO_TRIGGER_SECRET: process.env.DEMO_TRIGGER_SECRET ?? 'aura-demo',
+  GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
   FORCE_FALLBACK: process.env.FORCE_FALLBACK === '1',
 };
 ```
@@ -230,13 +225,9 @@ export const env = {
 `.env.local.example`:
 ```
 SERPAPI_KEY=
-ANTHROPIC_API_KEY=
-ONESIGNAL_APP_ID=
-ONESIGNAL_REST_API_KEY=
-DEMO_TRIGGER_SECRET=aura-demo
+GROQ_API_KEY=
 FORCE_FALLBACK=0
 NEXT_PUBLIC_VAPI_PUBLIC_KEY=
-NEXT_PUBLIC_ONESIGNAL_APP_ID=
 ```
 
 ### 5.2 `POST /api/feed`
@@ -298,39 +289,52 @@ e.g. `minimalist matte-black desk accessories -rgb -neon`. Cap at 120 chars.
 
 **`POST /api/vibe`** takes the loose keywords Vapi extracted and produces a clean `VibeShift` + query.
 
-LLM path (`source: "llm"`), using the Anthropic TypeScript SDK:
-```ts
-import Anthropic from '@anthropic-ai/sdk';
-const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+LLM path (`source: "llm"`) — Groq via `groq-sdk` (`pnpm add groq-sdk`). The API is OpenAI-compatible:
 
-const response = await client.messages.create({
-  model: 'claude-opus-5',
-  max_tokens: 1024,
-  thinking: { type: 'disabled' },          // latency; valid at effort <= high
-  output_config: {
-    effort: 'low',
-    format: {
-      type: 'json_schema',
+```ts
+import Groq from 'groq-sdk';
+const groq = new Groq({ apiKey: env.GROQ_API_KEY });
+
+const completion = await groq.chat.completions.create({
+  model: 'openai/gpt-oss-20b',
+  temperature: 0.3,
+  max_completion_tokens: 512,
+  messages: [
+    { role: 'system', content: VIBE_SYSTEM_PROMPT },
+    { role: 'user', content: JSON.stringify({ profile, newKeywords, dealbreakers, rawUtterance }) },
+  ],
+  response_format: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'vibe_shift',
+      strict: true,                       // constrained decoding — gpt-oss-20b/120b only
       schema: {
         type: 'object',
         properties: {
-          addAffinities:    { type: 'array', items: { type: 'string' } },
-          addDealbreakers:  { type: 'array', items: { type: 'string' } },
-          setCategories:    { type: 'array', items: { type: 'string' } },
-          setContext:       { type: 'string' },
-          label:            { type: 'string' },
-          query:            { type: 'string' },
+          addAffinities:   { type: 'array', items: { type: 'string' } },
+          addDealbreakers: { type: 'array', items: { type: 'string' } },
+          setCategories:   { type: 'array', items: { type: 'string' } },
+          setContext:      { type: 'string' },
+          label:           { type: 'string' },
+          query:           { type: 'string' },
         },
         required: ['addAffinities','addDealbreakers','setCategories','setContext','label','query'],
-        additionalProperties: false,
+        additionalProperties: false,      // required by strict mode
       },
     },
   },
-  system: VIBE_SYSTEM_PROMPT,
-  messages: [{ role: 'user', content: JSON.stringify({ profile, newKeywords, dealbreakers, rawUtterance }) }],
-}, { timeout: 8000 });
+}, { timeout: 5000 });
+
+const parsed = JSON.parse(completion.choices[0].message.content!);
 ```
-Parse `response.content.find(b => b.type === 'text').text` as JSON. On **any** failure (no key, timeout, parse error, `stop_reason === 'refusal'`) → rules path.
+
+**Model notes.**
+- `openai/gpt-oss-20b` — ~1000 tok/s, 131k context, **strict** structured outputs. This is the default: latency is the whole point here.
+- `openai/gpt-oss-120b` — same strict support, ~500 tok/s. Swap in only if 20b produces sloppy categories.
+- `llama-3.3-70b-versatile` — no strict mode (`strict: true` is silently ignored), so it can emit schema-violating JSON. Avoid for this route.
+- Strict mode **requires** `additionalProperties: false` and every property listed in `required`. Both are set above; don't "simplify" them out.
+
+On **any** failure (no key, timeout, parse error, schema mismatch) → rules path.
 
 `VIBE_SYSTEM_PROMPT` (verbatim):
 ```
@@ -409,7 +413,7 @@ export interface SeedCard {
 | `vintage` | Vintage Leather | brown leather jacket | `["leather jackets"]` | `["vintage","leather","brown"]` |
 | `outdoor` | Trail Gear | hiking pack on ridge | `["hiking gear","outdoor"]` | `["outdoor","technical","earth tone"]` |
 
-Images: put 5 JPEGs in `public/seed/`. Keep each **under 300 KB**, 3:4 aspect. Serve with plain `<img>` (see §11 Images) or `next/image` with `unoptimized`.
+Images: put 5 JPEGs in `public/seed/`. Keep each **under 300 KB**, 3:4 aspect. Serve with plain `<img>` (see §10 Images) or `next/image` with `unoptimized`.
 
 ### 6.2 `SwipeDeck.tsx` behavior
 - Renders the stack with the top card interactive; the two below are visible at `scale: 1 - i*0.05, y: i*12`.
@@ -471,8 +475,8 @@ export function assistantConfig(profile: StyleDNA) {
   return {
     firstMessage: "I'm listening — what are we shopping for?",
     model: {
-      provider: 'anthropic',
-      model: 'claude-opus-5',
+      provider: 'groq',
+      model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'system', content: systemPrompt(profile) }],
       tools: [SHIFT_FEED_VIBE_TOOL],
     },
@@ -482,7 +486,9 @@ export function assistantConfig(profile: StyleDNA) {
   };
 }
 ```
-> If the Anthropic provider is unavailable in the team's Vapi account, fall back to `{ provider: 'openai', model: 'gpt-4o' }` — the tool contract is unchanged.
+> **Verify the Groq provider + model in the Vapi dashboard before Phase 3.** Vapi maintains its own per-provider model allowlist and it lags Groq's catalog. `llama-3.3-70b-versatile` is the safest Groq tool-calling model; `openai/gpt-oss-20b` is faster but may not be exposed by Vapi yet. If the Groq provider is unavailable on your Vapi account, fall back to `{ provider: 'openai', model: 'gpt-4o-mini' }` — the tool contract is unchanged.
+>
+> Note this is a *different* model choice from `/api/vibe`. Vapi needs conversational tool-calling; `/api/vibe` needs fast constrained JSON. They don't have to match.
 
 **Tool definition** (client-side tool — Vapi emits it, we handle it; it returns no result to the model, which is fine because the assistant's spoken confirmation is scripted in the system prompt):
 ```ts
@@ -518,7 +524,7 @@ export const SHIFT_FEED_VIBE_TOOL = {
 
 **System prompt** (`systemPrompt(profile)`), verbatim, with the profile JSON interpolated:
 ```
-You are Aura, a shopping DJ. You are terse, warm, and fast. Never more than
+You are HAPA, a shopping DJ. You are terse, warm, and fast. Never more than
 two short sentences.
 
 The user is scrolling a live shopping feed. Here is their current style profile:
@@ -578,14 +584,16 @@ Shown when `location.search` contains `debug=1`, or after any Vapi error. A text
 
 ---
 
-## 9. PWA & Push (WS-A / WS-F)
+## 9. PWA Shell (WS-A)
+
+No push, no service worker. This section exists purely so the app runs full-screen off the iOS Home Screen without Safari chrome.
 
 ### 9.1 `app/manifest.ts`
 ```ts
 import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Aura', short_name: 'Aura',
+    name: 'HAPA', short_name: 'HAPA',
     description: 'The AI DJ for shopping',
     start_url: '/', display: 'standalone',
     background_color: '#0a0a0a', theme_color: '#0a0a0a',
@@ -600,8 +608,8 @@ export default function manifest(): MetadataRoute.Manifest {
 ### 9.2 `app/layout.tsx` metadata
 ```ts
 export const metadata: Metadata = {
-  title: 'Aura', description: 'The AI DJ for shopping',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Aura' },
+  title: 'HAPA', description: 'The AI DJ for shopping',
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'HAPA' },
 };
 export const viewport: Viewport = {
   themeColor: '#0a0a0a', viewportFit: 'cover',
@@ -610,31 +618,11 @@ export const viewport: Viewport = {
 ```
 Body: `bg-black text-white overscroll-none select-none`.
 
-### 9.3 OneSignal (WS-F)
-1. `public/OneSignalSDKWorker.js` — download from the OneSignal dashboard. Must be served from origin root as `application/javascript`. Vercel does this for `public/` automatically.
-2. In `layout.tsx`, `<Script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" strategy="afterInteractive" />` plus an inline init:
-   ```js
-   window.OneSignalDeferred = window.OneSignalDeferred || [];
-   OneSignalDeferred.push(async (OneSignal) => {
-     await OneSignal.init({ appId: NEXT_PUBLIC_ONESIGNAL_APP_ID });
-   });
-   ```
-3. Prompt for push permission **after onboarding completes**, never on load.
-4. `POST /api/notify` — body `{ secret, title, body, url }`. Verify `secret === env.DEMO_TRIGGER_SECRET`, then:
-   ```
-   POST https://onesignal.com/api/v1/notifications
-   Authorization: Basic <ONESIGNAL_REST_API_KEY>
-   { app_id, included_segments: ["Subscribed Users"], headings: {en: title},
-     contents: {en: body}, url }
-   ```
-5. Ship a trivial trigger page at `/trigger` (or just a `curl` in the runbook) so a teammate can fire it from a laptop at 1:50.
-
-**iOS reality check:** web push on iOS requires iOS 16.4+ **and** the site added to the Home Screen. Test this on the actual demo phone the day before. If it fails, the outro falls back to a screen-recorded notification.
-
 ---
 
-## 10. Visual Design
+## 10. Visual Design & Cross-cutting Gotchas
 
+### 10.1 Design
 Dark, high-contrast, single accent.
 
 ```css
@@ -652,10 +640,7 @@ Dark, high-contrast, single accent.
 - Toast: top-center, `bg-accent text-black`, mono font, rounded-full, auto-dismiss 4 s. Renders exactly as `[Vibe Shift: {label}]`.
 - Feed flush transition: fade out at `opacity: 0` over 180 ms → swap → fade in with a 40 px upward slide. This is the moment the audience is watching.
 
----
-
-## 11. Cross-cutting Gotchas
-
+### 10.2 Gotchas
 1. **Images.** Product thumbnails come from arbitrary hosts (`encrypted-tbn*.gstatic.com`, merchant CDNs). Do **not** fight `next/image` `remotePatterns` — use a plain `<img>` for product thumbnails and add `/* eslint-disable @next/next/no-img-element */` at the top of `ProductSlide.tsx`. Local seed images may use `next/image`.
 2. **`'use client'`** on every component with hooks/state: all of `components/**`, `ProfileContext.tsx`, `lib/vapi.ts`.
 3. **Server-only files** (`lib/env.ts`, `lib/serpapi.ts`, route handlers) must never be imported from a client component. `lib/query.ts` and `lib/profile.ts` must stay **isomorphic** (no `server-only`, no `window` at module scope) — both sides use them.
@@ -667,51 +652,49 @@ Dark, high-contrast, single accent.
 
 ---
 
-## 12. Workstreams
+## 11. Workstreams
 
 Assign one agent per stream. **WS-A must land `lib/types.ts`, `lib/profile.ts`, and `lib/ProfileContext.tsx` before B/C/D start** — everything else can run in parallel.
 
 | WS | Owner scope | Deliverables | Blocks | Blocked by |
 |---|---|---|---|---|
-| **A — Shell & State** | `app/layout.tsx`, `app/page.tsx`, `app/globals.css`, `app/manifest.ts`, `lib/types.ts`, `lib/profile.ts`, `lib/ProfileContext.tsx`, `components/ui/*`, icons | Types frozen, provider, routing between onboarding/feed, toast host, DebugBar, PWA meta, theme tokens | B, C, D, F | — |
+| **A — Shell & State** | `app/layout.tsx`, `app/page.tsx`, `app/globals.css`, `app/manifest.ts`, `lib/types.ts`, `lib/profile.ts`, `lib/ProfileContext.tsx`, `components/ui/*`, icons, Vercel deploy + env vars | Types frozen, provider, routing between onboarding/feed, toast host, DebugBar, PWA meta, theme tokens, live preview URL | B, C, D | — |
 | **B — Onboarding** | `components/onboarding/*`, `public/seed/*` | 5-card swipe deck, tap buttons, DNA-building beat, progress dots | — | A (types + context) |
 | **C — Feed** | `components/feed/*` | Snap-scroll feed, infinite loader, product slide, epoch flush, skeleton | — | A (types + context), E (API shape only — mock until ready) |
 | **D — Voice** | `lib/vapi.ts`, `components/voice/*` | Vapi client, assistant + tool config, mic FAB state machine, tool-call handler, transcript overlay, 2.5 s client-side fallback shift | — | A, E (`/api/vibe`) |
-| **E — Data** | `app/api/feed/route.ts`, `app/api/vibe/route.ts`, `lib/serpapi.ts`, `lib/query.ts`, `lib/env.ts`, `data/fallback_feed.json`, `.env.local.example` | Both routes returning valid shapes with SerpApi + LLM + fallbacks, curated 30-item JSON | C, D | A (types) |
-| **F — Push & Ops** | `public/OneSignalSDKWorker.js`, OneSignal init in layout, `app/api/notify/route.ts`, `/trigger` page, deploy | Working push on the demo phone, trigger button, Vercel env vars set | — | A (layout) |
+| **E — Data** | `app/api/feed/route.ts`, `app/api/vibe/route.ts`, `lib/serpapi.ts`, `lib/query.ts`, `lib/env.ts`, `data/fallback_feed.json`, `.env.local.example` | Both routes returning valid shapes with SerpApi + Groq + fallbacks, curated 30-item JSON | C, D | A (types) |
 
 ### Mocking contract (unblocks C and D before E lands)
 Until `/api/feed` exists, `Feed.tsx` may import `data/fallback_feed.json` directly behind a `USE_MOCK` const. Until `/api/vibe` exists, `handleShift` may call the rules-based path inline. Both must be swapped to the real routes before integration.
 
 ---
 
-## 13. Build Order & Time Budget
+## 12. Build Order & Time Budget
 
 Assume ~6 working hours.
 
 | Phase | Duration | Content | Gate |
 |---|---|---|---|
-| 0 | 20 min | WS-A lands types + context + globals + layout. Everyone pulls. `pnpm add motion @vapi-ai/web @anthropic-ai/sdk` | `pnpm dev` boots, `pnpm build` passes |
-| 1 | 90 min | B, C, E, F in parallel. C uses mocks. | Feed scrolls with fallback data; deck completes and writes DNA |
-| 2 | 60 min | E wires SerpApi live; C swaps to `/api/feed` | Real products render on the phone |
+| 0 | 20 min | WS-A lands types + context + globals + layout. Everyone pulls. `pnpm add motion @vapi-ai/web groq-sdk` | `pnpm dev` boots, `pnpm build` passes |
+| 1 | 90 min | B, C, E in parallel. C uses mocks. | Feed scrolls with fallback data; deck completes and writes DNA |
+| 2 | 60 min | E wires SerpApi + Groq live; C swaps to `/api/feed` | Real products render on the phone |
 | 3 | 90 min | D: Vapi call connects, tool fires, feed flushes | Say the demo line → feed changes |
-| 4 | 45 min | Polish: transitions, toast, safe areas, skeleton, DebugBar | Looks good on the actual demo phone |
-| 5 | 45 min | F: push on device. Full run-through ×3, timed. | Under 2:00 with 15 s slack |
+| 4 | 60 min | Polish: transitions, toast, safe areas, skeleton, DebugBar | Looks good on the actual demo phone |
+| 5 | 40 min | Full run-through ×3, timed. | Under 2:00 with 15 s slack |
 
 **Hard cutoff:** if voice isn't working by the end of Phase 3, ship the DebugBar as the interaction and present it as "typed for demo reliability, voice is the same code path." Do not burn Phase 4/5 on Vapi.
 
 ---
 
-## 14. Demo Runbook
+## 13. Demo Runbook
 
 Pre-flight (do this the night before, on the demo phone, on venue WiFi if possible):
 - [ ] App installed to Home Screen; opens without Safari chrome
-- [ ] Push permission granted; test notification received
 - [ ] `clearProfile()` run so onboarding shows (add a long-press-logo reset)
 - [ ] Mic permission pre-granted
 - [ ] Airplane-mode test: fallback feed still renders
 - [ ] `FORCE_FALLBACK=1` deploy on a second Vercel URL as the panic button
-- [ ] Phone: Do Not Disturb ON except OneSignal; brightness max; auto-lock off
+- [ ] Phone: Do Not Disturb ON; brightness max; auto-lock off
 
 Run of show:
 | t | Action | Failure mode → recovery |
@@ -721,20 +704,23 @@ Run of show:
 | 0:55 | Tap mic, say the Squamish line | No connect → open `?debug=1`, type it |
 | 1:15 | Feed flushes; olive rain jacket | Wrong item → scroll one; fallback ranking guarantees it's top-3 |
 | 1:30 | Tap Buy Now, show merchant page | Slow → don't wait, close and continue |
-| 1:45 | Close app, closing line | — |
-| 1:50 | Teammate hits `/trigger` on laptop | No banner → have the screen recording queued |
+| 1:45 | Scroll back into the feed, closing line over the live camping vibe | — |
+
+> The outro previously ended on a push notification. That's cut — land the close on the feed itself, or on a one-liner about what HAPA learned in 90 seconds.
 
 ---
 
-## 15. Definition of Done
+## 14. Definition of Done
 
 - [ ] `pnpm build` passes with zero TypeScript errors
 - [ ] Cold load → onboarding → feed in under 30 s on 4G
 - [ ] `/api/feed` returns ≥12 items in <2.5 s p95 with SerpApi live; <150 ms with fallback
+- [ ] `/api/vibe` returns in <1.5 s p95 with Groq live
 - [ ] `/api/feed` and `/api/vibe` **never** return a non-2xx
 - [ ] Killing network mid-scroll does not blank the feed
 - [ ] Voice shift → visible feed change in <3 s from end of utterance
 - [ ] DebugBar reproduces every voice behavior
-- [ ] No secret appears in the client bundle (`grep -r "SERPAPI\|sk-ant" .next/static` returns nothing)
+- [ ] No secret appears in the client bundle (`grep -r "SERPAPI\|gsk_" .next/static` returns nothing)
 - [ ] Runs full-screen from the iOS Home Screen with correct safe areas
 - [ ] Full demo executed end-to-end 3× under 2:00
+```
