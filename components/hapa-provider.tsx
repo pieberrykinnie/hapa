@@ -28,6 +28,14 @@ import type {
 
 const DNA_STORAGE_KEY = "hapa.dna";
 const BILLING_STORAGE_KEY = "hapa.billing";
+const SAVED_STORAGE_KEY = "hapa.saved";
+
+const BILLING_LABELS: Record<BillingProvider, string> = {
+  applepay: "Apple Pay",
+  gpay: "Google Pay",
+  paypal: "PayPal",
+  affirm: "Affirm",
+};
 
 export type Screen = "identity" | "swipe" | "billing" | "building" | "feed";
 
@@ -36,6 +44,7 @@ interface HapaContextValue {
   dna: StyleDNA;
   vibeImages: VibeImage[];
   billing: BillingMethod | null;
+  saved: Product[];
   order: Order | null;
   items: Product[];
   activeCategory: string;
@@ -48,6 +57,8 @@ interface HapaContextValue {
   swipe: (tags: string[], liked: boolean, isLast: boolean) => void;
   connectBilling: (provider: BillingProvider) => void;
   setCategory: (category: string) => void;
+  toggleSaved: (product: Product) => void;
+  isSaved: (id: string) => boolean;
   loadMore: () => void;
   applyVibeShift: (shift: VibeShift) => void;
   dismissToast: () => void;
@@ -93,6 +104,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
   const [dna, setDNA] = useState<StyleDNA>(EMPTY_DNA);
   const [vibeImages, setVibeImages] = useState<VibeImage[]>([]);
   const [billing, setBilling] = useState<BillingMethod | null>(null);
+  const [saved, setSaved] = useState<Product[]>([]);
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState("for-you");
@@ -142,13 +154,16 @@ export function HapaProvider({ children }: { children: ReactNode }) {
     if (params.get("onboard")) {
       localStorage.removeItem(DNA_STORAGE_KEY);
       localStorage.removeItem(BILLING_STORAGE_KEY);
+      localStorage.removeItem(SAVED_STORAGE_KEY);
       return;
     }
     const storedDNA = loadJSON<StyleDNA>(DNA_STORAGE_KEY);
     const storedBilling = loadJSON<BillingMethod>(BILLING_STORAGE_KEY);
+    const storedSaved = loadJSON<Product[]>(SAVED_STORAGE_KEY);
     /* Hydrating persisted state is exactly the "sync from an external system"
        case an effect is for — localStorage can't be read during SSR render. */
     /* eslint-disable react-hooks/set-state-in-effect */
+    if (storedSaved) setSaved(storedSaved);
     if (storedBilling) setBilling(storedBilling);
     if (storedDNA && storedDNA.likes.length > 0 && storedBilling) {
       setDNA({ ...EMPTY_DNA, ...storedDNA });
@@ -221,12 +236,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
    */
   const connectBilling = useCallback(
     (provider: BillingProvider) => {
-      const label =
-        provider === "card"
-          ? "Visa ·· 4242"
-          : provider === "paypal"
-            ? "PayPal"
-            : "Affirm";
+      const label = BILLING_LABELS[provider];
       const method: BillingMethod = {
         provider,
         label,
@@ -255,11 +265,31 @@ export function HapaProvider({ children }: { children: ReactNode }) {
   const setCategory = useCallback(
     (category: string) => {
       setActiveCategory(category);
+      // "Saved" is a local view over bookmarks — nothing to fetch, and the
+      // fetched items are kept so switching back doesn't reload the feed.
+      if (category === "saved") return;
       setStatus("loading");
       setItems([]);
       fetchFeed({ dna, category, cursor: 0, replace: true });
     },
     [dna, fetchFeed],
+  );
+
+  // Bookmarks live in the feed: the "Saved" chip filters to them, so there's
+  // no separate screen to navigate to.
+  const toggleSaved = useCallback((product: Product) => {
+    setSaved((prev) => {
+      const next = prev.some((p) => p.id === product.id)
+        ? prev.filter((p) => p.id !== product.id)
+        : [product, ...prev];
+      saveJSON(SAVED_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const isSaved = useCallback(
+    (id: string) => saved.some((p) => p.id === id),
+    [saved],
   );
 
   const loadMore = useCallback(() => {
@@ -375,6 +405,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
       dna,
       vibeImages,
       billing,
+      saved,
       order,
       items,
       activeCategory,
@@ -387,6 +418,8 @@ export function HapaProvider({ children }: { children: ReactNode }) {
       swipe,
       connectBilling,
       setCategory,
+      toggleSaved,
+      isSaved,
       loadMore,
       applyVibeShift,
       dismissToast,
@@ -399,6 +432,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
       dna,
       vibeImages,
       billing,
+      saved,
       order,
       items,
       activeCategory,
@@ -411,6 +445,8 @@ export function HapaProvider({ children }: { children: ReactNode }) {
       swipe,
       connectBilling,
       setCategory,
+      toggleSaved,
+      isSaved,
       loadMore,
       applyVibeShift,
       dismissToast,

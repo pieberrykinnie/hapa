@@ -44,7 +44,7 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
       initial={{ opacity: 0, y: 48 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 48 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
       className="absolute inset-0 z-30 flex flex-col bg-ink"
     >
       <div className="flex items-center justify-between px-7 pt-[calc(env(safe-area-inset-top)+20px)]">

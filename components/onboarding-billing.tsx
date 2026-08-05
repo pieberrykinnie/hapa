@@ -11,7 +11,8 @@ const PROVIDERS: {
   sub: string;
   mark: string;
 }[] = [
-  { id: "card", name: "Card", sub: "Visa, Mastercard, Amex", mark: "▭" },
+  { id: "applepay", name: "Apple Pay", sub: "Double-click to confirm", mark: "" },
+  { id: "gpay", name: "Google Pay", sub: "Pay with your saved cards", mark: "G" },
   { id: "paypal", name: "PayPal", sub: "Pay with your balance", mark: "P" },
   { id: "affirm", name: "Affirm", sub: "Split it over 4 payments", mark: "A" },
 ];

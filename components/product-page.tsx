@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import type { Product } from "@/lib/types";
 import { useHapa } from "./hapa-provider";
-import { HeartIcon } from "./icons";
+import { BookmarkIcon } from "./icons";
 import { ProductPhoto } from "./product-photo";
 
 export function ProductPage({
@@ -17,7 +17,8 @@ export function ProductPage({
   onBack: () => void;
   onBuy: () => void;
 }) {
-  const { dna } = useHapa();
+  const { dna, toggleSaved, isSaved } = useHapa();
+  const saved = isSaved(product.id);
   const matchTags = [
     ...product.tags.filter((t) => dna.likes.includes(t)),
     ...product.tags.filter((t) => !dna.likes.includes(t)),
@@ -29,11 +30,13 @@ export function ProductPage({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
       className="absolute inset-0 z-20 flex flex-col bg-paper"
     >
       {/* hero — shared element from the feed card photo */}
       <motion.div
         layoutId={layoutKey}
+        transition={{ type: "spring", damping: 34, stiffness: 460 }}
         className="relative h-[420px] shrink-0 overflow-hidden"
       >
         <ProductPhoto
@@ -50,10 +53,16 @@ export function ProductPage({
         </button>
         <button
           type="button"
-          aria-label="Save"
+          aria-label={saved ? "Remove bookmark" : "Save for later"}
+          aria-pressed={saved}
+          onClick={() => toggleSaved(product)}
           className="absolute right-5 top-[calc(env(safe-area-inset-top)+16px)] flex size-11 items-center justify-center rounded-full bg-white/94"
         >
-          <HeartIcon size={22} color="#201d1a" />
+          <BookmarkIcon
+            size={22}
+            filled={saved}
+            color={saved ? "#3d6b4f" : "#201d1a"}
+          />
         </button>
         <div className="absolute inset-x-0 bottom-3.5 flex justify-center gap-[5px]">
           {Array.from({ length: galleryCount }).map((_, i) => (

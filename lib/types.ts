@@ -56,7 +56,7 @@ export interface VibeImage {
   name: string;
 }
 
-export type BillingProvider = "card" | "paypal" | "affirm";
+export type BillingProvider = "applepay" | "gpay" | "paypal" | "affirm";
 
 /**
  * What we keep after the user connects a payment method.

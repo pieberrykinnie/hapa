@@ -6,6 +6,7 @@ import {
   motion,
   useMotionValue,
   useTransform,
+  type Variants,
 } from "framer-motion";
 import { ONBOARDING_CARDS } from "@/lib/onboarding-cards";
 import { useHapa } from "./hapa-provider";
@@ -14,11 +15,25 @@ import { ProductPhoto } from "./product-photo";
 
 const SWIPE_THRESHOLD = 110;
 
+const CARD_VARIANTS: Variants = {
+  enter: { scale: 0.96, opacity: 0 },
+  center: { scale: 1, opacity: 1 },
+  // `dir` arrives from AnimatePresence's `custom`, read at exit time
+  exit: (dir: number) => ({
+    x: dir * 480,
+    opacity: 0,
+    transition: { duration: 0.28, ease: "easeOut" },
+  }),
+};
+
 export function Onboarding() {
   const { swipe } = useHapa();
   const [index, setIndex] = useState(0);
-  // exit direction for the flying card: 1 = liked (right), -1 = dismissed (left)
-  const [exitDir, setExitDir] = useState(1);
+  // Exit direction for the card flying off: 1 = liked (right), -1 = dismissed
+  // (left). Passed through AnimatePresence's `custom` so the *exiting* card
+  // reads the value set by the swipe that removed it — component props are
+  // already frozen by then, so plain state would lag one card behind.
+  const [exitDir, setExitDir] = useState(-1);
 
   const card = ONBOARDING_CARDS[index];
   const nextCard = ONBOARDING_CARDS[index + 1];
@@ -49,22 +64,20 @@ export function Onboarding() {
         {nextCard && (
           <div className="absolute inset-x-5 top-6 bottom-8 rotate-[4deg] rounded-3xl bg-sand-deep" />
         )}
-        <AnimatePresence>
+        <AnimatePresence custom={exitDir}>
           {card && (
             <SwipeCard
               key={card.id}
               caption={card.caption}
               image={card.image}
               label={card.label}
-              step={index + 1}
-              exitDir={exitDir}
               onCommit={commit}
             />
           )}
         </AnimatePresence>
       </div>
 
-      <div className="flex justify-center gap-6 px-7 pb-5">
+      <div className="flex justify-center gap-6 px-7 pb-[calc(env(safe-area-inset-bottom)+36px)] pt-2">
         <button
           type="button"
           aria-label="Not my vibe"
@@ -82,17 +95,6 @@ export function Onboarding() {
           <HeartIcon />
         </button>
       </div>
-
-      <div className="flex justify-center gap-1.5 pb-[calc(env(safe-area-inset-bottom)+32px)]">
-        {ONBOARDING_CARDS.map((c, i) => (
-          <span
-            key={c.id}
-            className={`h-[5px] w-[18px] rounded-[3px] ${
-              i < index ? "bg-pine" : "bg-line"
-            }`}
-          />
-        ))}
-      </div>
     </div>
   );
 }
@@ -101,32 +103,26 @@ function SwipeCard({
   caption,
   image,
   label,
-  step,
-  exitDir,
   onCommit,
 }: {
   caption: string;
   image: string;
   label: string;
-  step: number;
-  exitDir: number;
   onCommit: (liked: boolean) => void;
 }) {
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-14, 10]);
+  // resting tilt is the -2° from the design; drag rotates around it, and the
+  // fly-off inherits the rotation for free by driving the same value
+  const rotate = useTransform(x, [-220, 0, 220], [-16, -2, 12]);
 
   return (
     <motion.div
       className="absolute inset-x-7 top-6 bottom-8 flex flex-col overflow-hidden rounded-3xl bg-card shadow-card"
       style={{ x, rotate }}
-      initial={{ rotate: -2, scale: 0.96, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{
-        x: exitDir * 480,
-        rotate: exitDir * 18,
-        opacity: 0,
-        transition: { duration: 0.32, ease: "easeOut" },
-      }}
+      variants={CARD_VARIANTS}
+      initial="enter"
+      animate="center"
+      exit="exit"
       drag="x"
       dragSnapToOrigin
       dragElastic={0.8}
@@ -141,9 +137,6 @@ function SwipeCard({
       <div className="px-5 py-4">
         <div className="font-display text-base font-semibold text-ink">
           {label}
-        </div>
-        <div className="mt-0.5 text-xs font-medium text-ink-faint">
-          card {step} of 5
         </div>
       </div>
     </motion.div>
