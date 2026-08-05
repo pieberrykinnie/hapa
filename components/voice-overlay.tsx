@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useHapa } from "./hapa-provider";
 import { MicIcon } from "./icons";
@@ -62,12 +62,6 @@ function isPermissionError(error: unknown): boolean {
   return /permission|notallowed|denied/i.test(text);
 }
 
-function formatShiftSummary(shift: VibeShift): string {
-  const more = shift.add_keywords.join(" & ");
-  const less = [...shift.dealbreakers, ...shift.remove_keywords].join(" & ");
-  return `Updating your feed: more ${more || "your vibe"} · less ${less || "the rest"}`;
-}
-
 /** Simple heuristic for the typed fallback — "no "/"not "/"without " clauses become
  * dealbreakers, everything else is added. Voice keeps the real LLM parser (Vapi's
  * assistant); this only covers the degraded path when a call can't be used. */
@@ -91,20 +85,13 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
   const { applyVibeShift } = useHapa();
   const [callState, setCallState] = useState<CallState>("connecting");
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
-  const [appliedShift, setAppliedShift] = useState<VibeShift | null>(null);
   const [textInput, setTextInput] = useState("");
   const closedRef = useRef(false);
   const connectedRef = useRef(false);
   const speakingRef = useRef(false);
-  const pendingHangupRef = useRef(false);
-
-  const handleShift = useCallback(
-    (shift: VibeShift) => {
-      applyVibeShift(shift);
-      setAppliedShift(shift);
-    },
-    [applyVibeShift],
-  );
+  // Holds a shift that arrived while hapa was still talking — applied once
+  // the modal has actually closed, not before.
+  const pendingShiftRef = useRef<VibeShift | null>(null);
 
   useEffect(() => {
     const vapi = getVapiClient();
@@ -124,11 +111,13 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
       if (cancelled) return;
       speakingRef.current = false;
       // The vibe shift landed while hapa was still talking — let her finish
-      // that line, then hang up instead of sitting there listening again.
-      if (pendingHangupRef.current) {
-        pendingHangupRef.current = false;
+      // that line, then close before switching the feed's vibe.
+      const pending = pendingShiftRef.current;
+      if (pending) {
+        pendingShiftRef.current = null;
         closedRef.current = true;
         onClose();
+        applyVibeShift(pending);
         return;
       }
       setCallState("listening");
@@ -164,14 +153,15 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
           try {
             const shift = toVibeShift(JSON.parse(call.function.arguments));
             if (!shift) continue;
-            handleShift(shift);
-            // One shift per call: stop listening once hapa's done confirming
-            // it, rather than sitting open for more input.
+            // One shift per call: close the modal first, then switch the
+            // feed's vibe — wait for hapa to finish confirming it if she's
+            // still mid-sentence, rather than cutting her off.
             if (speakingRef.current) {
-              pendingHangupRef.current = true;
+              pendingShiftRef.current = shift;
             } else {
               closedRef.current = true;
               onClose();
+              applyVibeShift(shift);
             }
           } catch {
             // malformed tool-call arguments — ignore, assistant may retry
@@ -201,7 +191,7 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
       vapi.removeListener("message", handleMessage);
       stopVapiCall();
     };
-  }, [handleShift, onClose]);
+  }, [applyVibeShift, onClose]);
 
   const close = () => {
     if (!closedRef.current) {
@@ -213,8 +203,9 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
   const submitText = () => {
     const trimmed = textInput.trim();
     if (!trimmed) return;
-    handleShift(parseTypedShift(trimmed));
-    setTextInput("");
+    const shift = parseTypedShift(trimmed);
+    close();
+    applyVibeShift(shift);
   };
 
   const isFallback = callState === "denied" || callState === "error";
@@ -293,20 +284,6 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex flex-col items-center gap-4 px-7 pb-[calc(env(safe-area-inset-bottom)+40px)]">
-        <AnimatePresence>
-          {appliedShift && (
-            <motion.div
-              key="toast"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl bg-bubble px-4 py-2.5"
-            >
-              <span className="text-[13px] font-medium text-paper-dim">
-                {formatShiftSummary(appliedShift)}
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
         {isFallback ? (
           <div className="flex w-full items-center gap-2.5">
             <input
