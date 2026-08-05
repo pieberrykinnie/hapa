@@ -57,7 +57,7 @@ export function ProductPage({
           <BookmarkIcon
             size={22}
             filled={saved}
-            color={saved ? "#3d6b4f" : "#201d1a"}
+            color={saved ? "#3f7d20" : "#14080e"}
           />
         </button>
         <div className="absolute inset-x-0 bottom-3.5 flex justify-center gap-[5px]">
@@ -80,7 +80,7 @@ export function ProductPage({
           <div className="mt-2 flex items-center gap-2.5">
             <span className="text-lg font-bold text-ink">${product.price}</span>
             {product.salePct != null && (
-              <span className="rounded-full bg-pine-tint px-2.5 py-1 text-xs font-semibold text-pine">
+              <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-semibold text-ink">
                 −{product.salePct}% at {product.merchant}
               </span>
             )}

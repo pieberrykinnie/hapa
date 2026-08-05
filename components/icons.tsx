@@ -1,6 +1,6 @@
 export function HeartIcon({
   size = 28,
-  color = "#faf7f2",
+  color = "#f7f5ee",
 }: {
   size?: number;
   color?: string;
@@ -14,7 +14,7 @@ export function HeartIcon({
 
 export function BookmarkIcon({
   size = 22,
-  color = "#201d1a",
+  color = "#14080e",
   filled = false,
 }: {
   size?: number;
@@ -40,7 +40,7 @@ export function BookmarkIcon({
 
 export function MicIcon({
   size = 20,
-  color = "#201d1a",
+  color = "#14080e",
 }: {
   size?: number;
   color?: string;
@@ -49,6 +49,65 @@ export function MicIcon({
     <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden>
       <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
       <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+    </svg>
+  );
+}
+
+export function PlusIcon({
+  size = 24,
+  color = "#f7f5ee",
+}: {
+  size?: number;
+  color?: string;
+}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden>
+      <path d="M11 3a1 1 0 0 1 2 0v8h8a1 1 0 0 1 0 2h-8v8a1 1 0 0 1-2 0v-8H3a1 1 0 0 1 0-2h8V3z" />
+    </svg>
+  );
+}
+
+export function TypeIcon({
+  size = 22,
+  color = "#14080e",
+}: {
+  size?: number;
+  color?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M4 6h16M4 12h16M4 18h10" />
+    </svg>
+  );
+}
+
+export function PhotoIcon({
+  size = 22,
+  color = "#14080e",
+}: {
+  size?: number;
+  color?: string;
+}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="4" width="18" height="16" rx="3" stroke={color} strokeWidth="2" />
+      <circle cx="8.5" cy="9.5" r="1.75" fill={color} />
+      <path
+        d="M5 17l4.5-5 3.5 4 2.5-3L21 17"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

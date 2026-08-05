@@ -1,20 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Sora, Figtree } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
-  variable: "--font-sora",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
-});
-
-const figtree = Figtree({
-  variable: "--font-figtree",
-  subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
   title: "hapa",
   description: "Your feed, your vibe. An AI DJ for shopping.",
+  icons: {
+    icon: "/brand/hapa-logo.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#faf7f2",
+  themeColor: "#F7F5EE",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -33,7 +32,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${sora.variable} ${figtree.variable} h-full antialiased`}>
+    <html lang="en" className={`${manrope.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

@@ -70,7 +70,7 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
               className="wave-bar w-1.5 rounded-[3px]"
               style={{
                 height: h,
-                background: i === 2 || i === 4 ? "#6f9c81" : "#3d6b4f",
+                background: i === 2 || i === 4 ? "#c8e087" : "#3f7d20",
                 animationDelay: `${i * 0.12}s`,
                 animationPlayState: step === 3 ? "paused" : "running",
               }}
@@ -126,7 +126,7 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
           onClick={close}
           className="flex size-[62px] items-center justify-center rounded-full bg-pine"
         >
-          <MicIcon size={26} color="#faf7f2" />
+          <MicIcon size={26} color="#f7f5ee" />
         </button>
       </div>
     </motion.div>
