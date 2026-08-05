@@ -311,7 +311,7 @@ export interface CheckoutSession {
   review: CheckoutReview | null;
   missingFields: string[];
   eligiblePaymentMethods: PaymentMethodReadiness[];
-  providerSessionSecret: string | null; // returned only to the owning client when needed
+  providerClientSecret?: string; // only included in the specific response that needs it; never logged
   createdAt: string;
   updatedAt: string;
 }
