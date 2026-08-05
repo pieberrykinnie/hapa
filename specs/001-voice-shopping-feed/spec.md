@@ -6,6 +6,8 @@
 
 **Status**: Draft
 
+**Prototype Mode**: The current implementation is device-local. Name, a compressed photo preview, five decisions, style preferences, and payment preference/defer state are stored in this browser's `localStorage`. This mode is not authentication and must not be represented as production account or payment security.
+
 **Input**: User description: "Add login, name and optional photo onboarding, a photo-informed ‘This you?’ calibration with five swipeable categories, payment-method setup, and an AI-assisted Buy Now flow that prepares the purchase but always asks for confirmation before Apple Pay, Google Pay, PayPal, Affirm, or another eligible method completes it."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -39,13 +41,14 @@ As a new shopper, I want to react to five category or style suggestions so that 
 
 **Acceptance Scenarios**:
 
-1. **Given** a valid uploaded photo, **When** analysis completes, **Then** the “This you?” page shows exactly five shopping-relevant category or style suggestions derived from visible, non-sensitive cues in the photo.
-2. **Given** no uploaded photo or unavailable photo analysis, **When** the “This you?” page opens, **Then** it shows exactly five varied generic shopping categories.
-3. **Given** a visible suggestion, **When** the shopper swipes right or selects the positive action, **Then** its category and positive attributes are added to the shopper's style profile.
-4. **Given** a visible suggestion, **When** the shopper swipes left or selects the negative action, **Then** its strongest attributes become exclusions and its category is not added.
-5. **Given** a shopper who uses keyboard or visible buttons, **When** they accept or reject a suggestion, **Then** the result is identical to the corresponding swipe.
-6. **Given** all five suggestions have been reviewed, **When** the final choice is recorded, **Then** HAPA shows a concise style summary and advances to payment-method readiness.
-7. **Given** a shopper views photo-derived suggestions, **When** they inspect the page, **Then** HAPA explains that suggestions come from style-relevant visual signals and not identity or sensitive-trait analysis.
+1. **Given** a valid uploaded photo with a shopping-relevant filename, **When** prototype matching completes, **Then** the “This you?” page shows exactly five category or style suggestions derived from normalized filename keywords; a filename containing “jean” or “denim” produces five jeans-only suggestions with relevant imagery.
+2. **Given** multiple photos whose filenames match different supported concepts, **When** suggestions are built, **Then** HAPA interleaves the concept-specific cards so every matched concept appears before one repeats; jeans plus shirts produces a three-card/two-card mix.
+3. **Given** no uploaded photo, **When** the “This you?” page opens, **Then** it shows exactly five varied generic shopping categories.
+4. **Given** a visible suggestion, **When** the shopper swipes right or selects the positive action, **Then** its category and positive attributes are added to the shopper's style profile.
+5. **Given** a visible suggestion, **When** the shopper swipes left or selects the negative action, **Then** its strongest attributes become exclusions and its category is not added.
+6. **Given** a shopper who uses keyboard or visible buttons, **When** they accept or reject a suggestion, **Then** the result is identical to the corresponding swipe.
+7. **Given** all five suggestions have been reviewed, **When** the final choice is recorded, **Then** HAPA shows a concise style summary and advances to payment-method readiness.
+8. **Given** a shopper views filename-derived suggestions, **When** they inspect the page, **Then** HAPA explains that the prototype uses shopping keywords rather than identity or sensitive-trait analysis.
 
 ---
 
@@ -185,9 +188,9 @@ As a shopper, I want HAPA to run edge-to-edge from my phone's Home Screen so tha
 - **FR-002**: HAPA MUST support secure sign-in, returning-session restoration, reauthentication, and sign-out without exposing another shopper's data.
 - **FR-003**: Profile setup MUST require a display name and present photo upload as optional.
 - **FR-004**: Photo upload MUST support preview, replacement, removal, file validation, and a clear explanation of how the photo affects recommendations.
-- **FR-005**: Photo analysis MUST be limited to shopping-relevant visible signals and MUST NOT identify people, perform face recognition, create biometric templates, or infer protected or sensitive traits.
+- **FR-005**: In Prototype Mode, photo matching MUST inspect only normalized filename keywords and MUST NOT inspect image pixels, identify people, perform face recognition, create biometric templates, or infer protected or sensitive traits.
 - **FR-006**: HAPA MUST allow a shopper to delete a stored photo and its derived, unconfirmed analysis data.
-- **FR-007**: HAPA MUST generate exactly five “This you?” suggestions from a usable photo analysis or exactly five generic suggestions when no usable photo analysis exists.
+- **FR-007**: HAPA MUST generate exactly five “This you?” suggestions from filename keywords or exactly five generic suggestions when no photo exists; one recognized concept fills the deck, while multiple recognized concepts are interleaved so each appears before a concept repeats. Jeans plus shirts MUST produce a 3/2 mixed deck.
 - **FR-008**: Every “This you?” suggestion MUST support equivalent positive and negative actions through gestures, visible controls, and keyboard input.
 - **FR-009**: Accepting a suggestion MUST add its category and positive attributes; rejecting it MUST add its strongest attributes as exclusions without adding the category.
 - **FR-010**: HAPA MUST store explicit shopper choices separately from machine-generated suggestions so generated signals never silently become confirmed preferences.
@@ -234,7 +237,7 @@ As a shopper, I want HAPA to run edge-to-edge from my phone's Home Screen so tha
 
 - **Shopper Account**: The authenticated identity that owns profile, onboarding, billing-readiness, style, and order records.
 - **Shopper Profile**: Display name, optional private photo reference, onboarding status, preferences, and deletion timestamps.
-- **Photo Analysis**: Temporary or persisted shopping-relevant visual signals, confidence, safety outcome, provenance, and generation time; never identity or biometric data.
+- **Prototype Filename Match**: Normalized, allow-listed shopping keywords derived from the local image filename, with source provenance; never pixel, identity, or biometric analysis.
 - **Style Suggestion**: One of five photo-derived or generic categories with positive attributes, rejection attributes, source, and shopper decision.
 - **Style Profile**: Confirmed weighted affinities, exclusions, active categories, context, price ceiling, provenance, version, and update time.
 - **Payment Method Readiness**: A method name, safe provider reference, preference state, eligibility status, reason, and last verification time.
@@ -249,7 +252,7 @@ As a shopper, I want HAPA to run edge-to-edge from my phone's Home Screen so tha
 ### Measurable Outcomes
 
 - **SC-001**: At least 90% of test shoppers can sign in, enter a name, upload or skip a photo, complete five “This you?” decisions, review payment readiness, and reach the feed without assistance.
-- **SC-002**: When photo analysis is usable, five shopping-relevant suggestions appear within 5 seconds for at least 95% of onboarding attempts; all other attempts fall back to generic suggestions within the same limit.
+- **SC-002**: Uploaded image filenames produce five shopping-relevant suggestions within 0.2 seconds; jeans-only input produces five denim cards, jeans-plus-shirts input produces a 3/2 mixed deck, and the no-photo path immediately uses the generic set.
 - **SC-003**: 100% of tested photo outputs contain no identity claim, biometric template, or protected or sensitive trait.
 - **SC-004**: Payment setup displays no method as Available when the relevant device, provider, merchant, region, currency, or order eligibility check says it is unavailable.
 - **SC-005**: At least 95% of live product requests show 12 usable products within 2.5 seconds; fallback requests do so within 0.15 seconds under intended demo conditions.
@@ -277,4 +280,5 @@ As a shopper, I want HAPA to run edge-to-edge from my phone's Home Screen so tha
 - PayPal, Affirm, and other payment methods may depend on business location, shopper location, currency, amount, merchant category, and provider approval.
 - The application may cache non-sensitive presentation preferences on the device, but the authenticated account is authoritative for profile and order data.
 - Live product, photo-analysis, and enhanced-language services may be configured, but generic calibration, curated feed, and deterministic direction fallbacks remain required.
+- Prototype photo personalization is intentionally simulated from allow-listed filename keywords; no image inference or model download is performed.
 - The target device supports modern mobile web capabilities, microphone access, Home Screen installation, and safe-area reporting.

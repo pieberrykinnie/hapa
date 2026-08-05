@@ -24,6 +24,73 @@ export interface StyleDNA {
   vibeHistory: { label: string; at: string }[];
 }
 
+export type OnboardingStage =
+  | "profile"
+  | "photo_processing"
+  | "this_you"
+  | "billing"
+  | "complete";
+
+export type SuggestionSource = "photo" | "generic";
+export type SuggestionDecision = "accept" | "reject";
+
+export interface ShopperProfile {
+  userId: string;
+  displayName: string | null;
+  photoPath: string | null;
+  photoVersion: number;
+  photoPreviewUrl: string | null;
+  onboardingStage: OnboardingStage;
+  preferredPaymentMethod: PaymentMethodId | null;
+  billingDeferred: boolean;
+}
+
+export interface StyleSuggestion {
+  id: string;
+  position: number;
+  category: string;
+  title: string;
+  description: string;
+  positiveAttributes: string[];
+  rejectionAttributes: string[];
+  imageKey: string;
+  source: SuggestionSource;
+  reason?: string;
+  palette?: string[];
+  imageUrl?: string;
+  imageCredit?: string;
+}
+
+export interface ConfirmedStyleProfile {
+  activeCategories: string[];
+  positiveAttributes: Record<string, number>;
+  exclusions: string[];
+  context: string | null;
+  priceCeiling: number | null;
+  version: 2;
+  updatedAt: string;
+}
+
+export type PaymentMethodId =
+  | "apple_pay"
+  | "google_pay"
+  | "paypal"
+  | "affirm"
+  | "card";
+
+export type PaymentReadinessStatus =
+  | "available"
+  | "setup_required"
+  | "unavailable";
+
+export interface PaymentMethodReadiness {
+  id: PaymentMethodId;
+  name: string;
+  status: PaymentReadinessStatus;
+  reason: string;
+  selectable: boolean;
+}
+
 export interface FeedState {
   items: Product[];
   activeCategory: string; // "for-you" | derived tags
@@ -56,7 +123,7 @@ export interface VibeImage {
   name: string;
 }
 
-export type BillingProvider = "applepay" | "gpay" | "paypal" | "affirm";
+export type BillingProvider = "applepay" | "gpay" | "paypal" | "affirm" | "card";
 
 /**
  * What we keep after the user connects a payment method.

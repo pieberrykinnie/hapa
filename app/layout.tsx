@@ -1,14 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Sora, Figtree } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
-  variable: "--font-sora",
-  subsets: ["latin"],
-});
-
-const figtree = Figtree({
-  variable: "--font-figtree",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -33,7 +28,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${sora.variable} ${figtree.variable} h-full antialiased`}>
+    <html lang="en" className={`${manrope.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

@@ -35,6 +35,7 @@ const BILLING_LABELS: Record<BillingProvider, string> = {
   gpay: "Google Pay",
   paypal: "PayPal",
   affirm: "Affirm",
+  card: "Card",
 };
 
 export type Screen = "identity" | "swipe" | "billing" | "building" | "feed";
@@ -99,11 +100,19 @@ function saveJSON(key: string, value: unknown) {
   }
 }
 
-export function HapaProvider({ children }: { children: ReactNode }) {
-  const [screen, setScreen] = useState<Screen>("identity");
-  const [dna, setDNA] = useState<StyleDNA>(EMPTY_DNA);
+export function HapaProvider({
+  children,
+  initialDNA,
+  initialBilling,
+}: {
+  children: ReactNode;
+  initialDNA?: StyleDNA;
+  initialBilling?: BillingMethod | null;
+}) {
+  const [screen, setScreen] = useState<Screen>(initialDNA ? "feed" : "identity");
+  const [dna, setDNA] = useState<StyleDNA>(initialDNA ?? EMPTY_DNA);
   const [vibeImages, setVibeImages] = useState<VibeImage[]>([]);
-  const [billing, setBilling] = useState<BillingMethod | null>(null);
+  const [billing, setBilling] = useState<BillingMethod | null>(initialBilling ?? null);
   const [saved, setSaved] = useState<Product[]>([]);
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<Product[]>([]);
@@ -146,38 +155,25 @@ export function HapaProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // Persisted taste survives a reload mid-demo; ?onboard=1 forces a fresh run.
-  // Runs in an effect (not render) because localStorage doesn't exist during
-  // SSR and the server HTML must hydrate cleanly before we switch screens.
+  // Authenticated profile/style state is supplied by the server. Only saved
+  // product presentation state remains a non-authoritative local convenience.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("onboard")) {
-      localStorage.removeItem(DNA_STORAGE_KEY);
-      localStorage.removeItem(BILLING_STORAGE_KEY);
-      localStorage.removeItem(SAVED_STORAGE_KEY);
-      return;
-    }
-    const storedDNA = loadJSON<StyleDNA>(DNA_STORAGE_KEY);
-    const storedBilling = loadJSON<BillingMethod>(BILLING_STORAGE_KEY);
     const storedSaved = loadJSON<Product[]>(SAVED_STORAGE_KEY);
     /* Hydrating persisted state is exactly the "sync from an external system"
        case an effect is for — localStorage can't be read during SSR render. */
     /* eslint-disable react-hooks/set-state-in-effect */
     if (storedSaved) setSaved(storedSaved);
-    if (storedBilling) setBilling(storedBilling);
-    if (storedDNA && storedDNA.likes.length > 0 && storedBilling) {
-      setDNA({ ...EMPTY_DNA, ...storedDNA });
-      setScreen("feed");
+    if (initialDNA) {
       setStatus("loading");
       fetchFeed({
-        dna: storedDNA,
+        dna: initialDNA,
         category: "for-you",
         cursor: 0,
         replace: true,
       });
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [fetchFeed]);
+  }, [fetchFeed, initialDNA]);
 
   // object URLs are revoked on unmount so uploads don't leak
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { Product } from "@/lib/types";
+import type { BillingMethod, Product, StyleDNA } from "@/lib/types";
 import { Feed } from "./feed";
 import { HapaProvider, useHapa } from "./hapa-provider";
 import { Onboarding } from "./onboarding";
@@ -12,9 +12,9 @@ import { ProductPage } from "./product-page";
 import { PurchaseFlow } from "./purchase-flow";
 import { VoiceOverlay } from "./voice-overlay";
 
-export function AppShell() {
+export function AppShell({ initialDNA, initialBilling }: { initialDNA: StyleDNA; initialBilling: BillingMethod | null }) {
   return (
-    <HapaProvider>
+    <HapaProvider initialDNA={initialDNA} initialBilling={initialBilling}>
       <div className="relative mx-auto h-dvh max-w-[430px] overflow-hidden bg-paper">
         <Screens />
       </div>
