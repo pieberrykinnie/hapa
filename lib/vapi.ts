@@ -50,21 +50,28 @@ export const HAPA_ASSISTANT_CONFIG: CreateAssistantDTO = {
   model: {
     provider: "openai",
     model: "gpt-4o-mini",
-    temperature: 0.4,
+    // Low temperature — this assistant's job is reliable tool-calling, not
+    // conversational variety. Higher values made it skip the tool call and
+    // just chat in response to a request.
+    temperature: 0.1,
     messages: [
       {
         role: "system",
         content:
-          "You are hapa, an upbeat AI DJ for a shopping app. The shopper describes " +
-          "an activity, mood, or thing they don't want, and you redirect their " +
-          "product feed to match. Keep replies to one short, casual sentence — " +
-          "confirm what you're doing, don't ask clarifying questions unless the " +
-          "request is completely empty of shopping content. " +
-          `Whenever the shopper names a new direction, immediately call the ${SHIFT_FEED_VIBE_TOOL} ` +
-          "tool with concrete lowercase keywords: add_keywords for what they now want, " +
-          "remove_keywords for prior keywords that no longer apply, and dealbreakers for " +
-          "anything they explicitly want excluded. You never place, confirm, or pay for " +
-          "an order — that always happens outside this call.",
+          "You are hapa, an upbeat AI DJ for a shopping app. Your ONLY job is to translate " +
+          `what the shopper says into a call to the ${SHIFT_FEED_VIBE_TOOL} tool — you do not ` +
+          "just chat about it. " +
+          `RULE: the moment the shopper names any activity, mood, category, or thing they don't ` +
+          `want, call ${SHIFT_FEED_VIBE_TOOL} in that same turn, before or while you reply. Do this ` +
+          "every single time, even for a short or casual request — never respond with only " +
+          "talk and no tool call. Only skip the call if the shopper said nothing shopping-related " +
+          "at all (e.g. small talk or a question about you). " +
+          "\n\nExample: shopper says \"I'm going camping this weekend, no neon\" → call " +
+          `${SHIFT_FEED_VIBE_TOOL} with add_keywords: ["camping"], remove_keywords: [], ` +
+          'dealbreakers: ["neon"] — THEN say something short like "Say less, pulling up camping gear, no neon."' +
+          "\n\nKeep spoken replies to one short, casual sentence confirming what you changed. " +
+          "Don't ask clarifying questions. You never place, confirm, or pay for an order — that " +
+          "always happens outside this call.",
       },
     ],
     tools: [
@@ -73,8 +80,11 @@ export const HAPA_ASSISTANT_CONFIG: CreateAssistantDTO = {
         async: true,
         function: {
           name: SHIFT_FEED_VIBE_TOOL,
+          strict: true,
           description:
-            "Redirect the shopper's product feed to a new activity, mood, or style direction.",
+            "Redirect the shopper's product feed to a new activity, mood, or style direction. " +
+            "Call this every time the shopper names something they want or don't want — never " +
+            "just reply in speech without calling it.",
           parameters: {
             type: "object",
             properties: {
@@ -116,6 +126,21 @@ export const HAPA_ASSISTANT_CONFIG: CreateAssistantDTO = {
     },
   },
 };
+
+/**
+ * The generated SDK types claim `toolCall.function.arguments` is always a
+ * JSON string, but in practice (at least with `strict: true`) Vapi/OpenAI's
+ * structured-output mode delivers it as an already-parsed object. Handle
+ * both so a shape mismatch can't silently drop a real tool call.
+ */
+export function parseToolArguments(raw: unknown): unknown {
+  if (typeof raw !== "string") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 export function toVibeShift(raw: unknown): VibeShift | null {
   if (typeof raw !== "object" || raw === null) return null;

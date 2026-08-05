@@ -8,6 +8,7 @@ import {
   HAPA_ASSISTANT_CONFIG,
   SHIFT_FEED_VIBE_TOOL,
   getVapiClient,
+  parseToolArguments,
   startVapiCall,
   stopVapiCall,
   toVibeShift,
@@ -35,7 +36,9 @@ interface VapiTranscriptMessage {
 
 interface VapiToolCallsMessage {
   type: "tool-calls";
-  toolCallList: { id: string; type: string; function: { name: string; arguments: string } }[];
+  // Despite the SDK's types, `arguments` isn't reliably a JSON string —
+  // `parseToolArguments` normalizes whatever shape actually arrives.
+  toolCallList: { id: string; type: string; function: { name: string; arguments: unknown } }[];
 }
 
 const BAR_HEIGHTS = [20, 44, 60, 34, 52, 24, 40];
@@ -148,25 +151,39 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
         setTranscript((prev) => [...prev.slice(-4), { role: m.role, text: m.transcript }]);
       } else if (type === "tool-calls") {
         const m = message as VapiToolCallsMessage;
-        for (const call of m.toolCallList ?? []) {
-          if (call.function?.name !== SHIFT_FEED_VIBE_TOOL) continue;
-          try {
-            const shift = toVibeShift(JSON.parse(call.function.arguments));
-            if (!shift) continue;
-            // One shift per call: close the modal first, then switch the
-            // feed's vibe — wait for hapa to finish confirming it if she's
-            // still mid-sentence, rather than cutting her off.
-            if (speakingRef.current) {
-              pendingShiftRef.current = shift;
-            } else {
-              closedRef.current = true;
-              onClose();
-              applyVibeShift(shift);
-            }
-          } catch {
-            // malformed tool-call arguments — ignore, assistant may retry
+        const calls = m.toolCallList ?? [];
+        if (calls.length === 0) {
+          console.warn("[hapa voice] tool-calls message with no toolCallList", m);
+        }
+        for (const call of calls) {
+          if (call.function?.name !== SHIFT_FEED_VIBE_TOOL) {
+            console.warn("[hapa voice] unexpected tool call", call.function?.name);
+            continue;
+          }
+          const shift = toVibeShift(parseToolArguments(call.function.arguments));
+          if (!shift) {
+            console.warn(
+              "[hapa voice] shift_feed_vibe call had an invalid payload shape",
+              call.function.arguments,
+            );
+            continue;
+          }
+          // One shift per call: close the modal first, then switch the
+          // feed's vibe — wait for hapa to finish confirming it if she's
+          // still mid-sentence, rather than cutting her off.
+          if (speakingRef.current) {
+            pendingShiftRef.current = shift;
+          } else {
+            closedRef.current = true;
+            onClose();
+            applyVibeShift(shift);
           }
         }
+      } else if (type && type !== "conversation-update" && type !== "model-output") {
+        // Anything else (status-update, speech-update, etc.) is expected
+        // noise; log unrecognized types so a silent integration gap is
+        // visible in the console instead of just "nothing happened".
+        console.debug("[hapa voice] unhandled message type", type, message);
       }
     };
 
