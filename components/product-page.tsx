@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { galleryFor } from "@/lib/gallery";
 import type { Product } from "@/lib/types";
 import { useHapa } from "./hapa-provider";
 import { BookmarkIcon } from "./icons";
@@ -19,7 +20,10 @@ export function ProductPage({
 }) {
   const { toggleSaved, isSaved } = useHapa();
   const saved = isSaved(product.id);
-  const galleryCount = Math.max(product.gallery.length, 4);
+  // A real photo (SerpApi thumbnail or curated image) is exactly one frame,
+  // not four — the old hardcoded minimum implied a swipeable gallery that
+  // was never actually there. This matches the feed card's own frame count.
+  const galleryCount = galleryFor(product).length;
 
   return (
     <motion.div
@@ -57,19 +61,21 @@ export function ProductPage({
           <BookmarkIcon
             size={22}
             filled={saved}
-            color={saved ? "#3d6b4f" : "#201d1a"}
+            color={saved ? "#3f7d20" : "#14080e"}
           />
         </button>
-        <div className="absolute inset-x-0 bottom-3.5 flex justify-center gap-[5px]">
-          {Array.from({ length: galleryCount }).map((_, i) => (
-            <span
-              key={i}
-              className={`h-[5px] rounded-[3px] ${
-                i === 0 ? "w-4 bg-ink" : "w-[5px] bg-ink/30"
-              }`}
-            />
-          ))}
-        </div>
+        {galleryCount > 1 && (
+          <div className="absolute inset-x-0 bottom-3.5 flex justify-center gap-[5px]">
+            {Array.from({ length: galleryCount }).map((_, i) => (
+              <span
+                key={i}
+                className={`h-[5px] rounded-[3px] ${
+                  i === 0 ? "w-4 bg-ink" : "w-[5px] bg-ink/30"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </motion.div>
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6">
@@ -80,7 +86,7 @@ export function ProductPage({
           <div className="mt-2 flex items-center gap-2.5">
             <span className="text-lg font-bold text-ink">${product.price}</span>
             {product.salePct != null && (
-              <span className="rounded-full bg-pine-tint px-2.5 py-1 text-xs font-semibold text-pine">
+              <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-semibold text-ink">
                 −{product.salePct}% at {product.merchant}
               </span>
             )}

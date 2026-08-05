@@ -4,6 +4,7 @@
 import { useRef } from "react";
 import { motion } from "framer-motion";
 import { useHapa } from "./hapa-provider";
+import { HapaWordmark } from "./hapa-logo";
 
 export function OnboardingIdentity() {
   const { dna, vibeImages, setName, addVibeImages, removeVibeImage, finishIdentity } =
@@ -13,10 +14,8 @@ export function OnboardingIdentity() {
 
   return (
     <div className="flex h-dvh flex-col bg-paper">
-      <header className="flex flex-col gap-1.5 px-7 pt-[calc(env(safe-area-inset-top)+20px)]">
-        <span className="font-display text-[15px] font-bold tracking-[-0.01em] text-pine">
-          hapa
-        </span>
+      <header className="flex flex-col gap-2 px-7 pt-[calc(env(safe-area-inset-top)+20px)]">
+        <HapaWordmark />
         <h1 className="font-display text-[28px] font-extrabold leading-[1.15] tracking-[-0.02em] text-ink">
           Who&apos;s shopping?
         </h1>
