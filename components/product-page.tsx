@@ -17,12 +17,8 @@ export function ProductPage({
   onBack: () => void;
   onBuy: () => void;
 }) {
-  const { dna, toggleSaved, isSaved } = useHapa();
+  const { toggleSaved, isSaved } = useHapa();
   const saved = isSaved(product.id);
-  const matchTags = [
-    ...product.tags.filter((t) => dna.likes.includes(t)),
-    ...product.tags.filter((t) => !dna.likes.includes(t)),
-  ].slice(0, 3);
   const galleryCount = Math.max(product.gallery.length, 4);
 
   return (
