@@ -43,3 +43,6 @@ next-env.d.ts
 # agent-local state (spec-kit skills under .claude/skills ARE tracked and shared)
 .claude/settings.local.json
 .claude/.credentials.json
+
+# design handoff reference (not app code)
+.design/
