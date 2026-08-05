@@ -66,6 +66,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<string | null>(null);
   const cursorRef = useRef<number | null>(0);
   const fetchIdRef = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   const fetchFeed = useCallback(
     async (opts: {
@@ -91,6 +92,7 @@ export function HapaProvider({ children }: { children: ReactNode }) {
       } catch {
         if (fetchId !== fetchIdRef.current) return;
       } finally {
+        if (!opts.replace) loadingMoreRef.current = false;
         if (fetchId === fetchIdRef.current) setStatus("idle");
       }
     },
@@ -147,7 +149,9 @@ export function HapaProvider({ children }: { children: ReactNode }) {
   );
 
   const loadMore = useCallback(() => {
-    if (status !== "idle" || cursorRef.current === null) return;
+    if (status !== "idle" || cursorRef.current === null || loadingMoreRef.current)
+      return;
+    loadingMoreRef.current = true;
     fetchFeed({
       dna,
       category: activeCategory,
