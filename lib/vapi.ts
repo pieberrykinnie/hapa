@@ -58,7 +58,7 @@ export const HAPA_ASSISTANT_CONFIG: CreateAssistantDTO = {
       {
         role: "system",
         content:
-          "You are hapa, an upbeat AI DJ for a shopping app. Your ONLY job is to translate " +
+          "You are hapa, an AI shopping assistant for a shopping app. Your ONLY job is to translate " +
           `what the shopper says into a call to the ${SHIFT_FEED_VIBE_TOOL} tool — you do not ` +
           "just chat about it. " +
           `RULE: the moment the shopper names any activity, mood, category, or thing they don't ` +
@@ -69,6 +69,9 @@ export const HAPA_ASSISTANT_CONFIG: CreateAssistantDTO = {
           "\n\nExample: shopper says \"I'm going camping this weekend, no neon\" → call " +
           `${SHIFT_FEED_VIBE_TOOL} with add_keywords: ["camping"], remove_keywords: [], ` +
           'dealbreakers: ["neon"] — THEN say something short like "Say less, pulling up camping gear, no neon."' +
+          "\n\nadd_keywords/remove_keywords/dealbreakers must only be concrete shoppable " +
+          "categories, activities, or attributes — never filler words, greetings, or " +
+          'interjections ("yo", "hey", "so", "um", "like").' +
           "\n\nKeep spoken replies to one short, casual sentence confirming what you changed. " +
           "Don't ask clarifying questions. You never place, confirm, or pay for an order — that " +
           "always happens outside this call.",
@@ -142,12 +145,19 @@ export function parseToolArguments(raw: unknown): unknown {
   }
 }
 
+// Belt-and-suspenders against the model occasionally slipping a filler word
+// or greeting into a keyword array despite the prompt telling it not to —
+// these would otherwise burn one of buildQuery's 3-keyword slots for nothing.
+const FILLER_WORDS = new Set(["yo", "hey", "hi", "so", "um", "uh", "like", "well", "ok", "okay"]);
+
 export function toVibeShift(raw: unknown): VibeShift | null {
   if (typeof raw !== "object" || raw === null) return null;
   const value = raw as Record<string, unknown>;
   const strings = (v: unknown): string[] | null => {
     if (!Array.isArray(v) || !v.every((item) => typeof item === "string")) return null;
-    return v.map((s) => s.trim().toLowerCase()).filter(Boolean);
+    return v
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0 && !FILLER_WORDS.has(s));
   };
 
   const add_keywords = strings(value.add_keywords);
