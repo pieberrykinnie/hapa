@@ -7,7 +7,7 @@ import { resetLocalOnboarding } from "@/lib/onboarding/local-store";
 import type { Product } from "@/lib/types";
 import { AddVibeRadial, type AddVibeMode } from "./add-vibe-radial";
 import { useHapa } from "./hapa-provider";
-import { BookmarkIcon } from "./icons";
+import { BookmarkIcon, CheckIcon, DeliveryIcon } from "./icons";
 import { ProductPhoto } from "./product-photo";
 
 const CATEGORIES = [
@@ -47,6 +47,7 @@ export function Feed({
   } = useHapa();
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollFrameRef = useRef(0);
+  const scrollEndTimerRef = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const swiping = useRef(false);
   const [chipsHidden, setChipsHidden] = useState(false);
@@ -92,7 +93,9 @@ export function Feed({
     touchStartY.current = null;
     if (swiping.current) {
       swiping.current = false;
-      setChipsHidden(false);
+      // Momentum may continue after the finger lifts. Let the scroll-settle
+      // timer reveal the chips so they do not flash back mid-snap.
+      if (scrollEndTimerRef.current === null) setChipsHidden(false);
     }
   };
 
@@ -100,6 +103,15 @@ export function Feed({
   // layout reads below (scrollHeight/clientHeight) from flushing style on every
   // event, which is what turns a long feed's scroll into a stutter.
   const handleScroll = () => {
+    setChipsHidden(true);
+    if (scrollEndTimerRef.current !== null) {
+      window.clearTimeout(scrollEndTimerRef.current);
+    }
+    scrollEndTimerRef.current = window.setTimeout(() => {
+      scrollEndTimerRef.current = null;
+      setChipsHidden(false);
+    }, 140);
+
     if (scrollFrameRef.current) return;
     scrollFrameRef.current = requestAnimationFrame(() => {
       scrollFrameRef.current = 0;
@@ -117,6 +129,9 @@ export function Feed({
   useEffect(() => {
     return () => {
       if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+      if (scrollEndTimerRef.current !== null) {
+        window.clearTimeout(scrollEndTimerRef.current);
+      }
     };
   }, []);
 
@@ -151,6 +166,7 @@ export function Feed({
           reveal, where the height animates back to "auto" and framer has to
           re-measure the subtree each frame. */}
       <motion.div
+        data-testid="feed-category-bar"
         className="relative z-10 shrink-0 overflow-hidden pt-[calc(env(safe-area-inset-top)+10px)]"
         animate={{
           y: chipsHidden ? -10 : 0,
@@ -227,28 +243,32 @@ export function Feed({
         onPointerMove={handlePointerMove}
         onPointerUp={endSwipe}
         onPointerCancel={endSwipe}
-        onPointerLeave={endSwipe}
-        className="snap-feed flex-1 overflow-y-auto px-4"
-        style={{ display: "flex", flexDirection: "column", gap: GAP }}
+        className={
+          showingSaved
+            ? "flex-1 overflow-y-auto px-4"
+            : "snap-feed flex-1 overflow-y-auto px-4"
+        }
+        style={
+          showingSaved
+            ? { scrollbarWidth: "none" }
+            : { display: "flex", flexDirection: "column", gap: GAP }
+        }
       >
-        {showSkeletons ? (
+        {showingSaved ? (
+          <SavedCollection
+            products={saved}
+            onOpenProduct={onOpenProduct}
+            onBuy={onBuy}
+            onBrowse={() => setCategory("for-you")}
+          />
+        ) : showSkeletons ? (
           [0, 1].map((i) => (
             <div
               key={i}
-              className="skeleton shrink-0 snap-start rounded-card"
+              className="feed-card skeleton shrink-0 rounded-card"
               style={{ height: `calc(100% - ${PEEK}px)` }}
             />
           ))
-        ) : list.length === 0 && showingSaved ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-10 text-center">
-            <BookmarkIcon size={28} color="#918a89" />
-            <p className="font-display text-base font-bold text-ink">
-              Nothing saved yet
-            </p>
-            <p className="text-[13.5px] text-ink-soft">
-              Tap the bookmark on any card to keep it here.
-            </p>
-          </div>
         ) : (
           cards
         )}
@@ -256,12 +276,155 @@ export function Feed({
       </div>
 
       {/* add — text, speech, or photo, hapa's three ways to steer the feed */}
-      <AddVibeRadial
-        open={addVibeOpen}
-        onOpenChange={setAddVibeOpen}
-        onSelect={onOpenAddVibe}
-      />
+      {!showingSaved && (
+        <AddVibeRadial
+          open={addVibeOpen}
+          onOpenChange={setAddVibeOpen}
+          onSelect={onOpenAddVibe}
+        />
+      )}
     </div>
+  );
+}
+
+function SavedCollection({
+  products,
+  onOpenProduct,
+  onBuy,
+  onBrowse,
+}: {
+  products: Product[];
+  onOpenProduct: (product: Product, layoutKey: string) => void;
+  onBuy: (product: Product) => void;
+  onBrowse: () => void;
+}) {
+  if (products.length === 0) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center px-8 pb-16 text-center">
+        <div className="flex size-16 items-center justify-center rounded-full bg-sand text-pine">
+          <BookmarkIcon size={27} color="#3f7d20" />
+        </div>
+        <h2 className="mt-5 font-display text-[22px] font-bold tracking-[-0.02em] text-ink">
+          Your shortlist starts here
+        </h2>
+        <p className="mt-2 max-w-[270px] text-[13.5px] leading-relaxed text-ink-soft">
+          Save anything worth a second look. It will stay ready here.
+        </p>
+        <button
+          type="button"
+          onClick={onBrowse}
+          className="mt-6 rounded-full bg-ink px-6 py-3 font-display text-sm font-bold text-paper"
+        >
+          Browse for you
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-[calc(env(safe-area-inset-bottom)+24px)]">
+      <div className="flex items-end justify-between px-1 pb-4 pt-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-pine">
+            Your shortlist
+          </p>
+          <h2 className="mt-1 font-display text-[24px] font-bold tracking-[-0.025em] text-ink">
+            Saved for later
+          </h2>
+        </div>
+        <span className="pb-1 text-[12px] font-semibold text-ink-faint">
+          {products.length} {products.length === 1 ? "item" : "items"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {products.map((product, index) => {
+          const layoutKey = `saved-photo-${product.id}-${index}`;
+          return (
+            <SavedCard
+              key={layoutKey}
+              product={product}
+              layoutKey={layoutKey}
+              onOpen={() => onOpenProduct(product, layoutKey)}
+              onBuy={() => onBuy(product)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SavedCard({
+  product,
+  layoutKey,
+  onOpen,
+  onBuy,
+}: {
+  product: Product;
+  layoutKey: string;
+  onOpen: () => void;
+  onBuy: () => void;
+}) {
+  const { toggleSaved, purchaseFor } = useHapa();
+  const purchased = purchaseFor(product.id);
+  const discount = getDiscountLabel(product);
+
+  return (
+    <article className="overflow-hidden rounded-[18px] border border-line/80 bg-card shadow-[0_7px_22px_rgba(20,8,14,0.06)]">
+      <motion.div layoutId={layoutKey} className="relative aspect-[4/5] bg-sand">
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={`Open saved ${product.title}`}
+          className="h-full w-full"
+        >
+          <ProductPhoto image={product.image} caption={product.title} />
+        </button>
+        <button
+          type="button"
+          aria-label={`Remove ${product.title} from saved`}
+          onClick={() => toggleSaved(product)}
+          className="absolute right-2 top-2 flex size-9 items-center justify-center rounded-full border border-pine/15 bg-lime shadow-float"
+        >
+          <BookmarkIcon size={17} filled color="#3f7d20" />
+        </button>
+        {purchased && (
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-ink/88 px-2.5 py-1.5 text-[9.5px] font-bold text-paper backdrop-blur-sm">
+            <CheckIcon size={12} />
+            Shipping
+          </div>
+        )}
+      </motion.div>
+
+      <div className="p-3">
+        <p className="truncate text-[9px] font-bold uppercase tracking-[0.07em] text-pine">
+          {product.merchant}
+        </p>
+        <button type="button" onClick={onOpen} className="mt-1 block w-full text-left">
+          <h3 className="line-clamp-2 min-h-[38px] font-display text-[14px] font-semibold leading-[1.35] text-ink">
+            {product.title}
+          </h3>
+        </button>
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="font-display text-[16px] font-bold text-ink">
+            {formatPrice(product.price, product.currency)}
+          </span>
+          {discount && (
+            <span className="rounded bg-lime px-1.5 py-1 text-[8.5px] font-bold uppercase text-ink">
+              {discount}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onBuy}
+          className="mt-3 w-full rounded-full bg-ink py-2.5 font-display text-[12px] font-bold text-paper"
+        >
+          {purchased ? "Buy another" : "Buy now"}
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -276,11 +439,16 @@ function FeedCard({
   onOpen: () => void;
   onBuy: () => void;
 }) {
-  const { toggleSaved, isSaved } = useHapa();
+  const { toggleSaved, isSaved, purchaseFor } = useHapa();
   const slots = galleryFor(product);
   const railRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState(0);
   const saved = isSaved(product.id);
+  const purchased = purchaseFor(product.id);
+  const discount = getDiscountLabel(product);
+  const perk = getFulfillmentPerk(product.description);
+  const description = getDisplayDescription(product.description, discount, perk);
+  const vibe = getVibeLabel(product.tags);
 
   const onRailScroll = () => {
     const el = railRef.current;
@@ -291,7 +459,7 @@ function FeedCard({
 
   return (
     <div
-      className="flex shrink-0 snap-start flex-col overflow-hidden rounded-card border border-line bg-card"
+      className="feed-card flex shrink-0 flex-col overflow-hidden rounded-card border border-line/80 bg-card shadow-[0_10px_34px_rgba(20,8,14,0.07)]"
       style={{ height: `calc(100% - ${PEEK}px)` }}
     >
       {/* swipeable image rail — horizontal snap inside the vertical feed */}
@@ -319,12 +487,22 @@ function FeedCard({
           ))}
         </div>
 
+        {vibe && (
+          <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-ink/88 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-paper shadow-float backdrop-blur-sm">
+            For your {vibe} vibe
+          </div>
+        )}
+
         <button
           type="button"
           aria-label={saved ? "Remove bookmark" : "Save for later"}
           aria-pressed={saved}
           onClick={() => toggleSaved(product)}
-          className="absolute right-3 top-3 flex size-11 items-center justify-center rounded-full bg-white/92 shadow-float"
+          className={`absolute right-3 top-3 flex size-11 items-center justify-center rounded-full border shadow-float backdrop-blur-sm transition-colors ${
+            saved
+              ? "border-pine/20 bg-lime text-pine"
+              : "border-white/60 bg-white/92 text-ink"
+          }`}
         >
           <BookmarkIcon
             size={20}
@@ -347,32 +525,104 @@ function FeedCard({
         )}
       </motion.div>
 
-      <div className="shrink-0 px-[18px] pb-3.5 pt-3">
-        <div className="flex items-start justify-between gap-3">
+      <div className="shrink-0 px-[18px] pb-4 pt-3.5">
+        <div className="flex items-end justify-between gap-4">
           <button
             type="button"
             onClick={onOpen}
             className="min-w-0 flex-1 text-left"
           >
-            <div className="truncate font-display text-[17px] font-bold text-ink">
+            <div className="mb-1 truncate text-[10px] font-bold uppercase tracking-[0.08em] text-pine">
+              {product.merchant}
+            </div>
+            <div className="truncate font-display text-[18px] font-semibold leading-tight text-ink">
               {product.title}
             </div>
-            <div className="mt-0.5 text-[13.5px] font-medium text-ink-soft">
-              ${product.price} · {product.merchant}
+            <div className="mt-2 flex items-center gap-2">
+              <span className="font-display text-xl font-bold leading-none text-ink">
+                {formatPrice(product.price, product.currency)}
+              </span>
+              {discount && (
+                <span className="rounded-md bg-lime px-2 py-1 text-[11px] font-bold uppercase tracking-[0.04em] text-ink">
+                  {discount}
+                </span>
+              )}
             </div>
           </button>
           <button
             type="button"
             onClick={onBuy}
-            className="shrink-0 rounded-full bg-ink px-[18px] py-[11px] font-display text-sm font-bold text-paper"
+            className="shrink-0 rounded-full bg-ink px-5 py-3 font-display text-sm font-bold text-paper shadow-[0_5px_16px_rgba(20,8,14,0.18)] transition-transform active:scale-[0.98]"
           >
-            Buy now
+            {purchased ? "Buy another" : "Buy now"}
           </button>
         </div>
-        <p className="mt-2 line-clamp-2 text-[13.5px] leading-[1.5] text-ink-soft">
-          {product.description}
-        </p>
+        {purchased ? (
+          <div className="mt-2 flex items-center gap-1.5 text-[12.5px] font-semibold text-pine">
+            <CheckIcon size={15} />
+            <span>Bought · Shipping to you</span>
+          </div>
+        ) : perk ? (
+          <div className="mt-2 flex items-center gap-1.5 text-[12.5px] font-semibold text-pine">
+            <DeliveryIcon size={15} />
+            <span>{perk}</span>
+          </div>
+        ) : description ? (
+          <p className="mt-2 line-clamp-1 text-[12.5px] leading-[1.45] text-ink-faint">
+            {description}
+          </p>
+        ) : null}
       </div>
     </div>
   );
+}
+
+function getDiscountLabel(product: Product): string | null {
+  if (product.salePct) return `${product.salePct}% off`;
+  const match = product.description.match(/\b(\d{1,2})%\s*off\b/i);
+  return match ? `${match[1]}% off` : null;
+}
+
+function getDisplayDescription(
+  description: string,
+  discount: string | null,
+  perk: string | null,
+) {
+  if (!description) return "";
+  if (discount && description.trim().toLowerCase() === discount.toLowerCase()) {
+    return "";
+  }
+  if (perk) return "";
+  return description;
+}
+
+function getFulfillmentPerk(description: string): string | null {
+  if (/free\s+(same[- ]day|next[- ]day)\s+delivery/i.test(description)) {
+    return "Free fast delivery";
+  }
+  if (/free\s+(delivery|shipping)/i.test(description)) return "Free delivery";
+  if (/same[- ]day\s+(delivery|shipping)/i.test(description)) {
+    return "Same-day delivery";
+  }
+  if (/(store|curbside)\s+pickup|pick\s*up/i.test(description)) {
+    return "Pickup available";
+  }
+  if (/free\s+returns?|easy\s+returns?/i.test(description)) {
+    return "Free returns";
+  }
+  return null;
+}
+
+function getVibeLabel(tags: string[]): string | null {
+  const ignored = new Set(["for-you", "fashion", "shopping", "style"]);
+  const tag = tags.find((value) => value && !ignored.has(value.toLowerCase()));
+  return tag?.replaceAll("-", " ") ?? null;
+}
+
+function formatPrice(price: number, currency: string) {
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: currency || "CAD",
+    maximumFractionDigits: Number.isInteger(price) ? 0 : 2,
+  }).format(price);
 }
