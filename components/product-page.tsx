@@ -96,16 +96,6 @@ export function ProductPage({
         <p className="text-[14.5px] leading-relaxed text-ink-soft">
           {product.description}
         </p>
-        <div className="flex flex-wrap gap-2">
-          {matchTags.map((tag, i) => (
-            <span
-              key={tag}
-              className="rounded-full border border-line bg-card px-3 py-[5px] text-xs font-semibold text-ink-soft"
-            >
-              {i === 0 ? `matches: ${tag}` : tag}
-            </span>
-          ))}
-        </div>
       </div>
 
       <div className="shrink-0 px-6 pb-[calc(env(safe-area-inset-bottom)+36px)] pt-4">
