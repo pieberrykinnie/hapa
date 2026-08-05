@@ -106,12 +106,13 @@ export const HAPA_ASSISTANT_CONFIG: CreateAssistantDTO = {
   },
 };
 
-/** Narrows a parsed tool-call argument payload down to a valid VibeShift, or null. */
 export function toVibeShift(raw: unknown): VibeShift | null {
   if (typeof raw !== "object" || raw === null) return null;
   const value = raw as Record<string, unknown>;
-  const strings = (v: unknown): string[] | null =>
-    Array.isArray(v) && v.every((item) => typeof item === "string") ? v : null;
+  const strings = (v: unknown): string[] | null => {
+    if (!Array.isArray(v) || !v.every((item) => typeof item === "string")) return null;
+    return v.map((s) => s.trim().toLowerCase()).filter(Boolean);
+  };
 
   const add_keywords = strings(value.add_keywords);
   const remove_keywords = strings(value.remove_keywords);
