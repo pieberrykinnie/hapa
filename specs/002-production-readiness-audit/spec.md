@@ -233,6 +233,10 @@ compared to show that finding closed and no dimension silently dropped.
   configure, run, and deploy the project.
 - **FR-030**: The audit MUST assess dependency and supply-chain posture, including whether
   dependency versions are reproducible.
+- **FR-035**: The audit MUST assess whether each external service tier the project depends on
+  permits the intended production use under its terms, and whether its quota ceiling accommodates
+  the expected user volume for a full billing period. Findings MUST quantify expected consumption
+  per user journey rather than asserting sufficiency.
 
 **Boundaries**
 
@@ -292,12 +296,18 @@ compared to show that finding closed and no dimension silently dropped.
 These defaults were chosen where the one-line request did not specify. Each can be changed, and the
 first two would change the audit's scope and severity ratings materially.
 
-- **The production bar is the one this project already wrote down.** "Production readiness" is
-  judged against the HAPA Constitution v2.1.0 and the `SPEC.md` Definition of Done — meaning real
-  shoppers, account-backed storage, private photo handling, and genuine payment execution. A
-  narrower target, such as a publicly reachable demo that handles no real money and no real personal
-  data, would leave many findings intact but reduce their severity. FR-033 exists so that re-scoring
-  does not require a fresh audit.
+- **The launch target is free-tier infrastructure at roughly five real users.** *(Amended
+  2026-08-05 during planning, on explicit user instruction.)* The safety and privacy bar remains the
+  HAPA Constitution v2.1.0 and the `SPEC.md` Definition of Done — real shoppers, account-backed
+  storage, private photo handling, genuine payment execution. What the constraint changes is the
+  other two axes: the **scale** bar drops to near zero, and **cost becomes a correctness property**
+  rather than a preference. A finding whose only remediation requires paid infrastructure is a
+  blocker, not a recommendation. Conversely, a finding that only matters at hundreds of users does
+  not block launch. See [research.md](./research.md) §R1–R2 for the resulting severity calibration.
+- **Real money is assumed to be in scope.** The user did not say whether the five users transact.
+  The audit assumes they do, because it is the safe direction: it produces a superset of findings,
+  and FR-033 requires every severity depending on this to declare it, so the narrower "closed
+  testing, no real money" reading is a one-pass re-score rather than a re-audit.
 - **The audit assesses and does not repair.** The deliverable is findings, not fixes. Remediation is
   expected to follow as separately planned work informed by this audit's backlog.
 - **Prototype Mode is a known, deliberate state, not a discovery.** The device-local persistence

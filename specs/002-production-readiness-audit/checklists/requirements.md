@@ -58,3 +58,20 @@ marker, because a defensible default existed in-repository for each:
 
 Both are called out at the top of the Assumptions section as the two that would materially change
 scope if the user intends otherwise.
+
+### Amendment during planning — 2026-08-05
+
+The first of those two assumptions was subsequently changed by the user, who constrained the launch
+target to **free-tier infrastructure at roughly five real users**. `spec.md` was amended during
+`/speckit-plan` rather than after it, as Constitution Principle V requires the contract to change
+before dependent work:
+
+- **FR-035 added** — service-tier terms and quota viability, a concern no existing requirement
+  covered and inside which Phase 0 research immediately found two launch blockers.
+- **Assumptions rewritten** — the production bar now states that the safety bar is unchanged, the
+  scale bar drops to near zero, and cost becomes a correctness property. A second assumption was
+  added recording that real money is presumed in scope, resolvable by FR-033 re-scoring.
+
+Re-validated after the amendment: all 16 checklist items still pass. FR-035 is testable, the new
+assumptions are stated rather than implied, and no implementation detail entered the requirements —
+the free-tier facts that motivated the change live in `research.md`, not in the spec.
