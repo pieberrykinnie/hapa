@@ -112,7 +112,7 @@ This plan adds **D16 — Service-Tier Viability** to close the gap. Under Princi
 changes first, so the spec was amended before the dimension was registered, not after: **`spec.md`
 now carries FR-035**, covering service-tier terms and quota viability, with wording derived in
 `research.md` (R6). The spec's Assumptions section was amended in the same pass, because its
-original statement of the production bar predated the free-tier constraint and would otherwise have
+original statement of the launch target predated the free-tier constraint and would otherwise have
 contradicted this plan.
 
 Both amendments are recorded in the spec itself with an "Amended 2026-08-05 during planning" note,
@@ -136,8 +136,18 @@ specs/002-production-readiness-audit/
 ├── checklists/
 │   └── requirements.md            # Spec quality checklist (complete)
 ├── tasks.md                       # Phase 2 output (/speckit-tasks — NOT created here)
+├── findings/                      # Phase 3 working output — one fragment per dimension
+│   ├── D01-identity-session.md    #   ... through D16-service-tier-viability.md
+│   └── _*.md                      #   provenance and captured command output
 └── audit-report.md                # The deliverable (produced by /speckit-implement)
 ```
+
+**Why `findings/` exists**: the 16 dimensions are designed to be assessed in parallel, but the
+report is a single file. Each dimension therefore writes its own fragment first, and an assembly
+step merges them in registry order. Without this, "parallel" would be nominal — 16 tasks contending
+for one file. The fragments are a **Phase 3 snapshot**, retained afterwards as working evidence;
+once assembly completes, `audit-report.md` is the single authoritative artifact and later enrichment
+passes edit only that file.
 
 ### Source code (repository root)
 

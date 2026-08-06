@@ -17,7 +17,7 @@ The single deliverable. Exactly one per run.
 | Field | Required | Rule | Source |
 |-------|----------|------|--------|
 | `overall_verdict` | Yes | One of `READY`, `NOT_READY`, `READY_WITH_CONDITIONS`. Appears before any finding. | FR-001 |
-| `launch_target` | Yes | The production definition judged against, stated in the document — free tiers only, ~5 users, real-money assumption. | FR-004 |
+| `launch_target` | Yes | The launch target judged against, stated in the document — free tiers only, ~5 users, real-money assumption. | FR-004 |
 | `assessed_at` | Yes | ISO date of the run. | FR-005 |
 | `repository_state` | Yes | Commit SHA and branch the audit describes. | FR-005 |
 | `severity_scheme` | Yes | The S0–S3 definitions and which levels block launch. | FR-003 |

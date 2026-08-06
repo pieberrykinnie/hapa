@@ -145,9 +145,15 @@ as swipe-based calibration; viewport variation.
 `components/add-vibe-radial.tsx`
 
 ### D14 — Documentation and Operator Onboarding
-**Spec**: FR-029
+**Spec**: FR-029, and **FR-010** (added 2026-08-05 — see amendment note below)
 **In scope**: Whether a new operator can configure, run, and deploy from the documentation present;
-accuracy of setup instructions.
+accuracy of setup instructions. **Also carries FR-010**: disagreements between documented behavior
+and actual behavior — including `SPEC.md` and `specs/001-voice-shopping-feed/spec.md` against what
+the code does — are recorded as `DOC_CONFLICT` findings with the actual behavior treated as
+authoritative.
+**Out of scope**: User-facing claims shown in the product interface, which belong to D13. The split
+is *where the claim lives*: D13 covers what a shopper reads on screen, D14 covers what a contributor
+reads in the repository.
 **Known starting point**: `README.md` is the unmodified `create-next-app` template and documents a
 port the project does not use.
 
@@ -174,7 +180,24 @@ Every required-coverage requirement in the spec maps to exactly one dimension.
 | FR-022 | D07 | | FR-030 | D15 |
 | FR-023 | D08 | | FR-035 | D16 |
 
+The map above covers the spec's *Required coverage* group only. One requirement from the
+*Evidence and honesty* group is also dimension-carried rather than schema-enforced:
+
+| Spec FR | Dimension | Note |
+|---------|-----------|------|
+| FR-010 | D14 | Documented-vs-actual divergence, surfaced as `DOC_CONFLICT` evidence |
+
+The remaining honesty requirements (FR-006, FR-007, FR-008, FR-009) are enforced by the finding
+schema and the Phase 7 validation pass rather than by any single dimension.
+
 **Amendment rule**: changing a scope boundary, adding a dimension, or removing one requires
 updating this file and the coverage map above **before** the affected dimension is audited, and
 noting the change in the report's provenance section. Dimensions may not be silently merged or
 split — cross-run comparability depends on stable IDs.
+
+### Amendment log
+
+| Date | Change | Reason |
+|------|--------|--------|
+| 2026-08-05 | D16 added | The free-tier constraint introduced service-tier terms and quota viability, which no existing dimension covered. Spec FR-035 added first. |
+| 2026-08-05 | D14 scope extended to carry FR-010; D13/D14 boundary stated explicitly | `/speckit-analyze` finding C2: FR-010 had zero coverage and the `DOC_CONFLICT` evidence type could not be produced by any task. Amended before any dimension was audited, as this rule requires. |

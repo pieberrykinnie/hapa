@@ -118,7 +118,7 @@ linking as a primary purpose, and soliciting donations. Commercial projects requ
 $20/month/member ([summary of Vercel's 2026 fair-use terms](https://www.promptstoproduct.com/vercel-free-tier-limits),
 corroborated by [independent pricing analysis](https://kuberns.com/blogs/vercel-pricing/)).
 
-**Implication**: the constitution names Vercel as the deployment target, and the production bar
+**Implication**: the constitution names Vercel as the deployment target, and the launch target
 includes real checkout. **A shopping application that processes real payments cannot lawfully run
 on Vercel's free tier.** This is a terms-of-service blocker, not a technical one — no amount of
 code quality resolves it. It sits precisely at the intersection the user's constraint created:
@@ -158,7 +158,7 @@ re-verification at remediation time.
 
 ## R4 — Free-tier availability of capabilities the prototype lacks
 
-The production bar requires capabilities this repository does not have at all: authenticated
+The launch target requires capabilities this repository does not have at all: authenticated
 identity, server-side authoritative persistence, private object storage for photographs, a payment
 provider, error monitoring, and automated quality gates.
 

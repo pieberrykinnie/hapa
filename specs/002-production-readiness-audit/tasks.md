@@ -39,6 +39,9 @@ choice.
 - Working evidence: `specs/002-production-readiness-audit/findings/_*.md`
 - Deliverable: `specs/002-production-readiness-audit/audit-report.md`
 
+After assembly (T025) the report is the single authoritative artifact; fragments are a Phase 3
+snapshot retained as working evidence and are deliberately not kept in sync.
+
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
@@ -87,23 +90,23 @@ fragment-per-dimension layout exists.
 - [ ] T011 [P] [US1] Assess **D03 Private Media Lifecycle** into `specs/002-production-readiness-audit/findings/D03-private-media.md` — trace consent, derivation, every hop, retention, and deletion across `components/onboarding/ProfileSetup.tsx`, `components/photo-vibe-overlay.tsx`, and `lib/onboarding/`. Reproduce **no** image data or image-derived personal content (Principle VII).
 - [ ] T012 [P] [US1] Assess **D04 Purchase Authorization** into `specs/002-production-readiness-audit/findings/D04-purchase-authorization.md` — enumerate every path in `components/purchase-flow.tsx`, `lib/purchase-agent.ts`, and `components/billing/` that can result in a charge, and determine whether explicit human confirmation of the exact total precedes each one (Principle VI).
 - [ ] T013 [P] [US1] Assess **D05 Truthful Outcome Reporting** into `specs/002-production-readiness-audit/findings/D05-truthful-outcomes.md` — determine whether any authentication, payment, or order outcome can render as more successful or certain than it is, including whether a timeout can become a false success (Principle III).
-- [ ] T014 [P] [US1] Assess **D06 Dependency Failure and Fallbacks** into `specs/002-production-readiness-audit/findings/D06-dependency-fallbacks.md` — for `lib/serpapi.ts`, `lib/vapi.ts`, `lib/fallback-feed.ts`, and `app/api/feed/route.ts`, determine behavior on timeout, malformed response, missing key, and **quota refusal**, and mark every fallback `VERIFIED` / `UNVERIFIED` / `NOT_EXERCISED` (Principle II).
+- [ ] T014 [P] [US1] Assess **D06 Dependency Failure and Fallbacks** into `specs/002-production-readiness-audit/findings/D06-dependency-fallbacks.md` — for `lib/serpapi.ts`, `lib/vapi.ts`, `lib/fallback-feed.ts`, and `app/api/feed/route.ts`, determine behavior on timeout, malformed response, missing key, and **quota refusal**, and mark every fallback `VERIFIED` / `UNVERIFIED` / `NOT_EXERCISED` (Principle II). Scope boundary with T024: this task covers *how the app behaves when a quota is refused*; T024 covers *whether the allowance suffices*. File each finding under one dimension only and cross-reference the other.
 - [ ] T015 [P] [US1] Assess **D07 Secrets and Configuration** into `specs/002-production-readiness-audit/findings/D07-secrets-configuration.md` — check the server/client boundary for all four referenced variables (`SERPAPI_KEY`, `NEXT_PUBLIC_VAPI_PUBLIC_KEY`, `FORCE_FALLBACK`, `NODE_ENV`), whether any secret is browser-reachable, and the gap against `.env.local.example`, which documents one of the four.
 - [ ] T016 [P] [US1] Assess **D08 Automated Quality Gates** into `specs/002-production-readiness-audit/findings/D08-quality-gates.md` — cite `_cmd-build.md`, `_cmd-test.md`, and `_cmd-lint.md`, and record the absence of `.github/workflows/` as an `ABSENT_ARTIFACT` against the constitution's "`pnpm build` clean is the merge bar" requirement.
 - [ ] T017 [P] [US1] Assess **D09 Test Adequacy on Critical Paths** into `specs/002-production-readiness-audit/findings/D09-test-adequacy.md` — map the 4 files in `tests/` against paths carrying money, personal data, and irreversible actions, and against each declared fallback. Judge by critical-path coverage, not aggregate percentage.
 - [ ] T018 [P] [US1] Assess **D10 Operability and Incident Response** into `specs/002-production-readiness-audit/findings/D10-operability.md` — determine whether a production failure would be noticed at all, what an operator can see, and whether a rollback path exists.
 - [ ] T019 [P] [US1] Assess **D11 Accessibility and Device Variation** into `specs/002-production-readiness-audit/findings/D11-accessibility.md` — check the shopper journey by keyboard and screen reader across `components/voice-overlay.tsx`, `components/onboarding/ThisYouDeck.tsx`, and `components/add-vibe-radial.tsx`, including behavior when microphone permission is denied or unavailable.
 - [ ] T020 [P] [US1] Assess **D12 Latency Budget Enforcement** into `specs/002-production-readiness-audit/findings/D12-latency-budgets.md` — verify real timeouts exist (`lib/serpapi.ts` `TIMEOUT_MS`, `lib/vapi.ts`, `app/api/feed/route.ts`) and that no expired budget converts into a false success (Principle IV).
-- [ ] T021 [P] [US1] Assess **D13 Disclosure Accuracy** into `specs/002-production-readiness-audit/findings/D13-disclosure-accuracy.md` — compare every user-facing claim about accounts, security, data location, and payment availability in `components/onboarding*.tsx` and `components/billing/` against what the code does, including the constitution's Prototype Mode labeling obligations.
-- [ ] T022 [P] [US1] Assess **D14 Documentation and Operator Onboarding** into `specs/002-production-readiness-audit/findings/D14-documentation.md` — determine whether a new operator can configure, run, and deploy from `README.md`, which is the unmodified `create-next-app` template and documents a port the project does not use.
+- [ ] T021 [P] [US1] Assess **D13 Disclosure Accuracy** into `specs/002-production-readiness-audit/findings/D13-disclosure-accuracy.md` — compare every user-facing claim about accounts, security, data location, and payment availability in `components/onboarding*.tsx` and `components/billing/` against what the code does, including the constitution's Prototype Mode labeling obligations. D13 covers what a **shopper reads on screen**; repository documentation belongs to T022.
+- [ ] T022 [P] [US1] Assess **D14 Documentation and Operator Onboarding** into `specs/002-production-readiness-audit/findings/D14-documentation.md` — determine whether a new operator can configure, run, and deploy from `README.md`, which is the unmodified `create-next-app` template and documents a port the project does not use. **Also discharge FR-010**: cross-check the behavior claimed by `SPEC.md` and `specs/001-voice-shopping-feed/spec.md` against what the code actually does, and record every divergence as a `DOC_CONFLICT` finding with the actual behavior treated as authoritative.
 - [ ] T023 [P] [US1] Assess **D15 Supply Chain and Reproducibility** into `specs/002-production-readiness-audit/findings/D15-supply-chain.md` — check pinning and lockfile integrity across `package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml`, whether the declared `packageManager` and Node engine are enforced, and cite the T001 frozen-install result.
-- [ ] T024 [P] [US1] Assess **D16 Service-Tier Viability** into `specs/002-production-readiness-audit/findings/D16-service-tier-viability.md` — re-derive and verify the Phase 0 observations in `research.md` §R3 rather than copying them: quantify SerpApi consumption per user journey against the 250/month and 50/hour ceilings, confirm Vercel Hobby's commercial-use restriction against real checkout, and assess Vapi's credit model. Every quota or pricing claim carries a `retrieved_at` date.
+- [ ] T024 [P] [US1] Assess **D16 Service-Tier Viability** into `specs/002-production-readiness-audit/findings/D16-service-tier-viability.md` — re-derive and verify the Phase 0 observations in `research.md` §R3 rather than copying them: quantify SerpApi consumption per user journey against the 250/month and 50/hour ceilings, confirm Vercel Hobby's commercial-use restriction against real checkout, and assess Vapi's credit model. Every quota or pricing claim carries a `retrieved_at` date. Scope boundary with T014: this task covers *sufficiency of the allowance*, not *behavior on refusal*.
 
 ### Report assembly
 
 - [ ] T025 [US1] Merge all 16 fragments into §5 of `specs/002-production-readiness-audit/audit-report.md` in **registry order** (D01–D05, D13, D06, D07, D10, D12, D16, D08, D09, D11, D14, D15 — safety first), each finding rendered exactly per `contracts/finding-schema.md`. Depends on T009–T024.
 - [ ] T026 [US1] Fill §4 dimension summary in `specs/002-production-readiness-audit/audit-report.md` — exactly 16 rows, each with verdict, blocking count, total count, and a `Basis` naming what was examined. A `PASS` row citing only the absence of problems fails spec FR-007 and must be rewritten. Depends on T025.
-- [ ] T027 [US1] Write §2 Scope in `specs/002-production-readiness-audit/audit-report.md` — the launch target (free tiers only, ~5 users), the real-money assumption stated explicitly as overturnable, the commit SHA from `_provenance.md`, and the assess-only boundary.
+- [ ] T027 [US1] Write §2 Scope in `specs/002-production-readiness-audit/audit-report.md` — the launch target (free tiers only, ~5 users), the real-money assumption stated explicitly as overturnable, the commit SHA read from `findings/_provenance.md` (T002), and the assess-only boundary.
 - [ ] T028 [US1] Write §3 Severity Scheme in `specs/002-production-readiness-audit/audit-report.md` reproduced verbatim from `contracts/finding-schema.md`, so no reader must open another file to interpret a severity.
 - [ ] T029 [US1] Write §6 Deferred by Scale in `specs/002-production-readiness-audit/audit-report.md` from `research.md` §R2 — scaling, pooling, load testing, abuse rate limiting, CDN optimization — each naming the assumption that defers it. No entry may read as a pass.
 - [ ] T030 [US1] Write §1 Verdict in `specs/002-production-readiness-audit/audit-report.md` — the overall verdict **derived** from the findings (`NOT_READY` if any S0/S1 exists; never `READY` while any dimension is `UNABLE_TO_ASSESS`) plus every blocking finding as a one-line entry. Nothing else in this section. Depends on T025, T026.
@@ -119,7 +122,8 @@ deliverable MVP — everything after this makes it more actionable, not more cor
 
 **Independent Test**: Pick any finding at random and open a scoped remediation task from it alone.
 
-**Note**: This phase enriches the findings produced in Phase 3; it does not re-audit them.
+**Note**: This phase enriches the findings produced in Phase 3; it does not re-audit them, and it
+edits only `audit-report.md`.
 
 - [ ] T031 [US2] Audit every finding in `specs/002-production-readiness-audit/audit-report.md` for a `resolution_condition` that is *checkable* rather than arguable, rewriting any that reads as advice ("consider adding tests") into an observable end state.
 - [ ] T032 [US2] Assign `free_tier_feasible` (`YES`/`NO`/`UNKNOWN`) to every finding in `specs/002-production-readiness-audit/audit-report.md` and enforce the calibration rule that `NO` forces at least S1 — under this launch target an unaffordable fix is a blocker.
@@ -145,9 +149,10 @@ their control.
 - [ ] T038 [US3] Verify the D03 photo-lifecycle trace in `specs/002-production-readiness-audit/audit-report.md` covers consent → derivation → every hop → retention → deletion with no gap, and scan the whole report to confirm no image data or image-derived personal content was reproduced anywhere (Principle VII).
 - [ ] T039 [US3] Scan every finding and resolution condition in `specs/002-production-readiness-audit/audit-report.md` for any recommendation that would remove or weaken a safety control, and remove it — spec FR-032 and SC-009 prohibit this outright.
 - [ ] T040 [US3] Verify every fallback assessed in T014 carries an honest `verification_state` in `specs/002-production-readiness-audit/audit-report.md`, with untested fallbacks marked `NOT_EXERCISED` rather than `VERIFIED` — the constitution states plainly that an untested fallback does not count.
+- [ ] T041 [US3] Discharge FR-034 in `specs/002-production-readiness-audit/audit-report.md` — for every finding, judge whether its stated resolution would collide with a constitution principle (for example, a fix for a quota or latency finding that weakens Principle II's fallback guarantee, or a photo-retention fix that conflicts with Principle VII). Set `principle_conflict` naming both the principle and the tension, and **surface it for a human decision rather than resolving it inside the audit**. This closes spec edge case 6.
 
-**Checkpoint**: The safety section stands alone and the non-negotiables are individually accounted
-for.
+**Checkpoint**: The safety section stands alone, the non-negotiables are individually accounted for,
+and no remediation silently trades one principle for another.
 
 ---
 
@@ -159,10 +164,10 @@ rather than asserted.
 **Independent Test**: Resolve one finding, re-run the audit, and confirm the two versions show that
 finding closed with no dimension silently dropped.
 
-- [ ] T041 [P] [US4] Verify every finding ID in `specs/002-production-readiness-audit/audit-report.md` matches `F-D<nn>-<nn>`, is unique, and is referenced consistently by any `blocked_by` entry.
-- [ ] T042 [P] [US4] Write §8 Provenance in `specs/002-production-readiness-audit/audit-report.md` — commands run and results, which quota and pricing claims carry which retrieval dates plus the instruction to re-verify at remediation time, and any dimension-registry amendment made during the run.
-- [ ] T043 [P] [US4] Add re-run guidance to §8 of `specs/002-production-readiness-audit/audit-report.md` — surviving findings keep their IDs, closed findings are marked resolved rather than deleted, and only genuinely new findings get new IDs (spec SC-011).
-- [ ] T044 [P] [US4] Verify exactly 16 dimensions appear in `specs/002-production-readiness-audit/audit-report.md`, since a differing count invalidates cross-run comparison: `grep -cE '^\| D[0-9]{2} ' specs/002-production-readiness-audit/audit-report.md` must return `16`.
+- [ ] T042 [P] [US4] Verify every finding ID in `specs/002-production-readiness-audit/audit-report.md` matches `F-D<nn>-<nn>`, is unique, and is referenced consistently by any `blocked_by` entry.
+- [ ] T043 [P] [US4] Write §8 Provenance in `specs/002-production-readiness-audit/audit-report.md` — commands run and results, which quota and pricing claims carry which retrieval dates plus the instruction to re-verify at remediation time, and any dimension-registry amendment made during the run (the registry's amendment log currently records two, dated 2026-08-05).
+- [ ] T044 [P] [US4] Add re-run guidance to §8 of `specs/002-production-readiness-audit/audit-report.md` — surviving findings keep their IDs, closed findings are marked resolved rather than deleted, and only genuinely new findings get new IDs (spec SC-011).
+- [ ] T045 [P] [US4] Verify exactly 16 dimensions appear in `specs/002-production-readiness-audit/audit-report.md`, since a differing count invalidates cross-run comparison: `grep -cE '^\| D[0-9]{2} ' specs/002-production-readiness-audit/audit-report.md` must return `16`.
 
 **Checkpoint**: A future re-run is directly comparable to this one.
 
@@ -173,12 +178,13 @@ finding closed with no dimension silently dropped.
 **Purpose**: Execute the validation contract in [quickstart.md](./quickstart.md) — this phase is the
 audit's equivalent of a test suite
 
-- [ ] T045 [P] Verify non-mutation with `git status --porcelain -- . ':!specs/'` from the repository root — expected output is empty. Any line is a spec FR-031 violation, not a style issue.
-- [ ] T046 [P] Verify the application is exactly as healthy as before the audit by re-running `pnpm build` and `pnpm test` and comparing against `_cmd-build.md` and `_cmd-test.md` (spec SC-010).
-- [ ] T047 [P] Verify evidence completeness in `specs/002-production-readiness-audit/audit-report.md` — the count of `#### F-D` finding headers equals the count of `**Evidence**` blocks. A finding without evidence is deleted, not softened (spec SC-003).
-- [ ] T048 [P] Verify every `EXTERNAL_TERMS` reference in `specs/002-production-readiness-audit/audit-report.md` carries a `retrieved_at` date; an undated quota claim cannot be trusted or refreshed.
-- [ ] T049 Walk the judgment checks in `specs/002-production-readiness-audit/quickstart.md` §Validating — SC-001, SC-004, SC-005, SC-008, SC-012 — and record the outcome of each in §8 Provenance. Depends on T045–T048.
-- [ ] T050 Confirm the fragment files under `specs/002-production-readiness-audit/findings/` are retained as working evidence and referenced from §8 Provenance, so any finding can be traced back to the pass that produced it.
+- [ ] T046 [P] Verify non-mutation with `git status --porcelain -- . ':!specs/'` from the repository root — expected output is empty. Any line is a spec FR-031 violation, not a style issue.
+- [ ] T047 [P] Verify the application is exactly as healthy as before the audit by re-running `pnpm build` and `pnpm test` and comparing against `findings/_cmd-build.md` and `findings/_cmd-test.md` (spec SC-010).
+- [ ] T048 [P] Verify evidence completeness in `specs/002-production-readiness-audit/audit-report.md` — the count of `#### F-D` finding headers equals the count of `**Evidence**` blocks. A finding without evidence is deleted, not softened (spec SC-003).
+- [ ] T049 [P] Verify every `EXTERNAL_TERMS` reference in `specs/002-production-readiness-audit/audit-report.md` carries a `retrieved_at` date; an undated quota claim cannot be trusted or refreshed.
+- [ ] T050 [P] Validate **schema conformance** of every finding in `specs/002-production-readiness-audit/audit-report.md` against the required-field table in `specs/002-production-readiness-audit/contracts/finding-schema.md`: each `#### F-D` block carries `Dimension`, `Severity`, `Kind`, `Verification`, `Free-tier feasible`, `Severity depends on assumption`, `Impact`, and `Resolution condition`. Confirm the closed vocabularies hold — severity is one of `S0`–`S3`, `kind` is `MISSING`/`INCORRECT`, `verification_state` is `VERIFIED`/`UNVERIFIED`/`NOT_EXERCISED` — and that the calibration rule `free_tier_feasible = NO → severity ≤ S1` is satisfied everywhere. Without this pass FR-008 and FR-012 are conventions rather than enforced requirements.
+- [ ] T051 Walk the judgment checks in `specs/002-production-readiness-audit/quickstart.md` §Validating — SC-001, SC-004, SC-005, SC-008, SC-012 — and record the outcome of each in §8 Provenance. Depends on T046–T050.
+- [ ] T052 Record in §8 Provenance of `specs/002-production-readiness-audit/audit-report.md` that the fragment files under `specs/002-production-readiness-audit/findings/` are retained as a **Phase 3 snapshot** — the state of each dimension at assembly time, before the Phase 4–6 enrichment passes — so a reader can trace any finding to the pass that produced it without mistaking a fragment for current content.
 
 ---
 
@@ -199,7 +205,8 @@ audit's equivalent of a test suite
 - **US1 (P1)**: The foundation. Every other story operates on findings it produces.
 - **US2 (P1)**: Needs US1's findings. Enriches them; never re-audits.
 - **US3 (P2)**: Needs US1's findings, particularly D03/D04/D05/D06. Independent of US2 — a
-  reviewer can get the safety assurance without the remediation ordering.
+  reviewer can get the safety assurance without the remediation ordering. One ordering caveat: T041
+  reads `resolution_condition` values, which T031 sharpens, so run T031 first if both are planned.
 - **US4 (P3)**: Needs US1's findings only. Independent of US2 and US3.
 
 **Honest note on independence**: US2, US3, and US4 are independently *testable* and independently
@@ -213,7 +220,8 @@ parallel.
 - Phase 3: all 16 dimension assessments are parallel; assembly (T025–T030) is strictly sequential
   after them, and T030 depends on T025 and T026
 - Phase 4: T034 depends on T033; the rest are sequential passes over one file
-- Phase 7: T049 depends on T045–T048
+- Phase 5: T041 is best run after T031 (see caveat above)
+- Phase 7: T051 depends on T046–T050
 
 ### Parallel Opportunities
 
@@ -221,11 +229,11 @@ parallel.
 - **T004, T005, T006** in Foundational — three independent commands, three separate files
 - **T009–T024** — the big one: all 16 dimension assessments, 16 distinct fragment files, zero
   write contention
-- **T041–T044** in US4
-- **T045–T048** in Polish
+- **T042–T045** in US4
+- **T046–T050** in Polish
 
-Tasks that write to `audit-report.md` (T025–T040, T042–T043) are deliberately **not** marked `[P]`,
-because they share one file.
+Tasks that write to `audit-report.md` (T025–T041, T043–T044, T052) are deliberately **not** marked
+`[P]`, because they share one file.
 
 ---
 
@@ -278,7 +286,7 @@ Task: "Assess D16 Service-Tier Viability into findings/D16-service-tier-viabilit
 
 ## Notes
 
-- The repository outside `specs/` is read-only for the entire audit (spec FR-031). T045 verifies it.
+- The repository outside `specs/` is read-only for the entire audit (spec FR-031). T046 verifies it.
 - Never copy image data, image-derived personal content, or secret values into any artifact
   (Principle VII). The finding schema deliberately has nowhere to put them.
 - Any claim that a Next.js 16 API is misused must cite `node_modules/next/dist/docs/`, indexed in

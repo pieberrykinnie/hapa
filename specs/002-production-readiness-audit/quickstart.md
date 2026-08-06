@@ -61,8 +61,18 @@ first (Constitution Principle V).
 
 3. **Assess each dimension**, producing findings per the schema. A dimension with nothing wrong
    still gets a verdict and a stated basis naming what was checked.
+
+   Each dimension writes to **its own fragment file** under `findings/` —
+   `findings/D01-identity-session.md` through `findings/D16-service-tier-viability.md`. This is what
+   makes the 16 assessments genuinely parallel: no two ever write the same file. Captured command
+   output and provenance live alongside them as `findings/_*.md`.
 4. **Assemble `audit-report.md`** in this directory, in the section order fixed by
-   [report-structure.md](./contracts/report-structure.md).
+   [report-structure.md](./contracts/report-structure.md), merging the fragments into §5 in registry
+   order.
+
+   After assembly, `audit-report.md` is the **single authoritative artifact**. The fragments are a
+   Phase 3 snapshot kept as working evidence — later enrichment passes edit only the report, so
+   fragments are deliberately not kept in sync and must not be read as current.
 
 ### Method constraints
 

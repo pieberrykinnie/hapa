@@ -75,3 +75,21 @@ before dependent work:
 Re-validated after the amendment: all 16 checklist items still pass. FR-035 is testable, the new
 assumptions are stated rather than implied, and no implementation detail entered the requirements —
 the free-tier facts that motivated the change live in `research.md`, not in the spec.
+
+### Amendment after cross-artifact analysis — 2026-08-05
+
+`/speckit-analyze` found eight cross-artifact issues (0 critical, 3 high, 3 medium, 2 low). All were
+remediated. Two touched this spec:
+
+- **FR-004 rewritten** to name **"launch target"** as the single term for the concept, replacing
+  three competing phrasings ("definition of production", "production bar", "production definition")
+  that had drifted across the artifacts. All eight occurrences elsewhere in the spec were
+  standardized to match.
+- **FR-035 annotated** to explain that it is numbered out of sequence deliberately — renumbering
+  would have broken the identifiers already referenced by the plan, contracts, and tasks, and stable
+  IDs are a property this feature explicitly values (FR-015, SC-011).
+
+The remaining six issues were resolved in `plan.md`, `quickstart.md`, `contracts/dimension-registry.md`,
+and `tasks.md`; two of them (FR-010 and FR-034 having zero task coverage) were requirement-coverage
+gaps rather than spec defects. Re-validated: all 16 checklist items still pass, and requirement
+coverage is now 35/35.

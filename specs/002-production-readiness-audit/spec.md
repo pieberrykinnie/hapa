@@ -51,7 +51,7 @@ opening a source file.
    **Then** it is reported as "unable to assess" with the reason, and is never silently counted as
    passing.
 5. **Given** the audit is complete, **When** the decision-maker checks its scope, **Then** the
-   definition of "production" the audit judged against is stated in the document itself.
+   launch target the audit judged against is stated in the document itself.
 
 ---
 
@@ -142,7 +142,7 @@ compared to show that finding closed and no dimension silently dropped.
 
 - What happens when a readiness dimension cannot be evaluated because the capability does not exist
   yet at all — for example, an authentication system to assess? The dimension is reported as a gap
-  against the production bar, not as a pass and not as inapplicable.
+  against the launch target, not as a pass and not as inapplicable.
 - What happens when the safest production behavior is the *absence* of a feature, such as real
   checkout being deliberately disabled during Prototype Mode? The audit records the current state as
   intentionally deferred and identifies what its later arrival will require, without scoring a
@@ -157,8 +157,8 @@ compared to show that finding closed and no dimension silently dropped.
   repository behaves when that service fails, not for the provider's own reliability.
 - What happens when a fix for one finding would violate a different constitutional principle? The
   conflict is surfaced for a human decision rather than resolved inside the audit.
-- What happens when a severity judgment depends on the production definition being assumed? The
-  finding states that dependency so a narrower launch target can be re-scored without a full re-run.
+- What happens when a severity judgment depends on the assumed launch target? The finding states
+  that dependency so a narrower launch target can be re-scored without a full re-run.
 
 ## Requirements *(mandatory)*
 
@@ -171,8 +171,10 @@ compared to show that finding closed and no dimension silently dropped.
 - **FR-002**: The audit MUST state a separate verdict for every readiness dimension it covers.
 - **FR-003**: The audit MUST define the severity scheme it uses, including which severities block a
   launch.
-- **FR-004**: The audit MUST state, in the document, the definition of "production" it judged
-  against.
+- **FR-004**: The audit MUST state, in the document, the **launch target** it judged against — the
+  definition of production in force, together with its scale assumption and its cost constraint.
+  "Launch target" is the single term used for this concept throughout the specification and all
+  downstream artifacts.
 - **FR-005**: The audit MUST record the date and the exact repository state it describes.
 
 **Evidence and honesty**
@@ -233,7 +235,10 @@ compared to show that finding closed and no dimension silently dropped.
   configure, run, and deploy the project.
 - **FR-030**: The audit MUST assess dependency and supply-chain posture, including whether
   dependency versions are reproducible.
-- **FR-035**: The audit MUST assess whether each external service tier the project depends on
+- **FR-035**: *(Added 2026-08-05 during planning; numbered out of sequence so that the identifiers
+  already referenced by the plan, contracts, and tasks stay stable. It belongs to this
+  Required-coverage group, not to Boundaries below.)* The audit MUST assess whether each external
+  service tier the project depends on
   permits the intended production use under its terms, and whether its quota ceiling accommodates
   the expected user volume for a full billing period. Findings MUST quantify expected consumption
   per user journey rather than asserting sufficiency.
@@ -244,15 +249,15 @@ compared to show that finding closed and no dimension silently dropped.
   remediation.
 - **FR-032**: The audit MUST NOT recommend removing or weakening a safety control in order to reach
   a passing verdict.
-- **FR-033**: Where a finding's severity depends on the assumed production definition, the audit
-  MUST state that dependency.
+- **FR-033**: Where a finding's severity depends on the assumed launch target, the audit MUST state
+  that dependency.
 - **FR-034**: Where remediating one finding would conflict with a stated project principle, the
   audit MUST surface the conflict for a human decision instead of resolving it.
 
 ### Key Entities
 
-- **Audit Report**: The single deliverable. Carries the overall verdict, the production definition
-  it used, the date and repository state assessed, the severity scheme, and all findings.
+- **Audit Report**: The single deliverable. Carries the overall verdict, the launch target it used,
+  the date and repository state assessed, the severity scheme, and all findings.
 - **Readiness Dimension**: One area of production readiness under assessment — identity, persistence,
   private media, commerce safety, dependency resilience, configuration and secrets, quality gates,
   test adequacy, operability, accessibility, latency, disclosure accuracy, documentation, supply
@@ -313,11 +318,11 @@ first two would change the audit's scope and severity ratings materially.
 - **Prototype Mode is a known, deliberate state, not a discovery.** The device-local persistence
   model is declared in `specs/001-voice-shopping-feed/spec.md` and permitted by the constitution's
   Local Prototype Exception. The audit's job is to state precisely what that choice costs at the
-  production bar, not to report it as a surprise defect.
+  launch target, not to report it as a surprise defect.
 - **The repository is the subject.** The audit covers this codebase, its configuration, its
   documentation, and its declared dependencies. Third-party providers are assessed only through how
   this repository behaves when they fail, degrade, or change.
-- **Findings about unbuilt capabilities are in scope.** Because the production bar includes
+- **Findings about unbuilt capabilities are in scope.** Because the launch target includes
   capabilities the prototype has not yet built, their absence is reported as a gap rather than
   excluded for being out of scope.
 - **The audience is technical but not steeped in this codebase.** The report is written to be acted
