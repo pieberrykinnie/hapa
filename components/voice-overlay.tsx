@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import * as Sentry from "@sentry/nextjs";
 import { useHapa } from "./hapa-provider";
 import { MicIcon } from "./icons";
 import {
@@ -9,6 +10,7 @@ import {
   SHIFT_FEED_VIBE_TOOL,
   getVapiClient,
   parseToolArguments,
+  raceConnectionOutcome,
   startVapiCall,
   stopVapiCall,
   toVibeShift,
@@ -63,6 +65,19 @@ function isPermissionError(error: unknown): boolean {
     .filter(Boolean)
     .join(" ");
   return /permission|notallowed|denied/i.test(text);
+}
+
+// Instrumentation only (spec FR-014/FR-017) — does not change the existing
+// denied/error state transitions. Mirrors isPermissionError's text-matching
+// approach since Vapi/Daily report quota exhaustion the same loosely-typed
+// way they report permission failures.
+function isQuotaError(error: unknown): boolean {
+  const e = error as Record<string, unknown> | null;
+  const nested = (e?.error as Record<string, unknown> | undefined) ?? {};
+  const text = [e?.message, e?.errorMsg, e?.msg, nested.message, nested.errorMsg, nested.msg]
+    .filter(Boolean)
+    .join(" ");
+  return /quota|usage limit|exceeded|out of (minutes|credits)|insufficient (balance|credits)/i.test(text);
 }
 
 /** Simple heuristic for the typed fallback — "no "/"not "/"without " clauses become
@@ -139,6 +154,9 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
     };
     const handleError = (error: unknown) => {
       if (cancelled) return;
+      if (isQuotaError(error)) {
+        Sentry.captureMessage("vapi-quota-warning", { level: "warning" });
+      }
       setCallState(isPermissionError(error) ? "denied" : "error");
     };
     const handleMessage = (message: unknown) => {
@@ -196,6 +214,14 @@ export function VoiceOverlay({ onClose }: { onClose: () => void }) {
 
     startVapiCall(HAPA_ASSISTANT_CONFIG).catch((error: unknown) => {
       if (!cancelled) setCallState(isPermissionError(error) ? "denied" : "error");
+    });
+
+    // A connection that neither succeeds nor fails within the bound is
+    // treated as a failure too, so the shopper never gets stuck on
+    // "connecting…" indefinitely (FR-013).
+    raceConnectionOutcome(vapi).then((outcome) => {
+      if (cancelled || outcome !== "timeout") return;
+      setCallState("error");
     });
 
     return () => {

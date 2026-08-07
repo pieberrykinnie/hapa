@@ -145,17 +145,13 @@ export interface BillingMethod {
   connectedAt: string;
 }
 
-export type PurchaseStage = "confirm" | "working" | "done" | "failed";
-
-export interface PurchaseStep {
-  label: string;
-  done: boolean;
-}
-
-export interface Order {
-  product: Product;
-  stage: PurchaseStage;
-  steps: PurchaseStep[];
-  orderRef: string | null;
-  error: string | null;
+/**
+ * Records that a shopper opened a product's real merchant listing — nothing
+ * more. No field here can carry a payment, order, or receipt claim.
+ */
+export interface ListingVisit {
+  productId: string;
+  merchant: string;
+  listingUrl: string;
+  openedAt: string[];
 }

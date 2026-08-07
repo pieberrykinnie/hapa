@@ -3,26 +3,20 @@
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { parseVibeText } from "@/lib/vibe-parser";
 import type { VibeShift } from "@/lib/types";
 import { useHapa } from "./hapa-provider";
 import { PhotoIcon } from "./icons";
 
-// Stands in for real vision analysis (see SPEC.md §6.3) — the demo has no
-// vision model wired up, so a photo always reads as this plausible shift.
-const PHOTO_DEMO_SHIFT: VibeShift = {
-  add_keywords: ["earth-tones", "vintage"],
-  remove_keywords: [],
-  dealbreakers: ["neon"],
-};
-const READING_MS = 1600;
-
 export function PhotoVibeOverlay({ onClose }: { onClose: () => void }) {
   const { applyVibeShift } = useHapa();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [photo, setPhoto] = useState<{ url: string; name: string } | null>(
+  const [photo, setPhoto] = useState<{ url: string; name: string; file: File } | null>(
     null,
   );
   const [reading, setReading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [textInput, setTextInput] = useState("");
 
   // the object URL is only ever held client-side and is revoked on swap/unmount
   useEffect(() => {
@@ -33,16 +27,39 @@ export function PhotoVibeOverlay({ onClose }: { onClose: () => void }) {
 
   const pick = (file: File) => {
     if (photo) URL.revokeObjectURL(photo.url);
-    setPhoto({ url: URL.createObjectURL(file), name: file.name });
+    setPhoto({ url: URL.createObjectURL(file), name: file.name, file });
+    setFailed(false);
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!photo || reading) return;
     setReading(true);
-    window.setTimeout(() => {
-      applyVibeShift(PHOTO_DEMO_SHIFT);
-      onClose();
-    }, READING_MS);
+    setFailed(false);
+    try {
+      const body = new FormData();
+      body.append("photo", photo.file);
+      const res = await fetch("/api/vibe-photo", { method: "POST", body });
+      const data = res.ok ? ((await res.json()) as { shift: VibeShift | null }) : null;
+      if (data?.shift) {
+        applyVibeShift(data.shift);
+        onClose();
+        return;
+      }
+      setFailed(true);
+    } catch {
+      setFailed(true);
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const submitTypedFallback = () => {
+    const trimmed = textInput.trim();
+    if (!trimmed) return;
+    const shift = parseVibeText(trimmed);
+    if (!shift) return;
+    applyVibeShift(shift);
+    onClose();
   };
 
   return (
@@ -80,11 +97,36 @@ export function PhotoVibeOverlay({ onClose }: { onClose: () => void }) {
               Reading your photo for colors, textures, and style…
             </p>
           </div>
+        ) : failed ? (
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-center text-[14.5px] text-paper-dim">
+              hapa couldn&apos;t read that photo. Type what you&apos;re after instead.
+            </p>
+            <div className="flex w-full items-center gap-2.5">
+              <input
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submitTypedFallback()}
+                placeholder="camping this weekend, no neon…"
+                className="flex-1 rounded-full border-[1.5px] border-line-dark bg-transparent px-4 py-3 text-[14.5px] text-paper outline-none placeholder:text-ink-faint"
+              />
+              <button
+                type="button"
+                aria-label="Apply"
+                onClick={submitTypedFallback}
+                className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-pine font-display text-[13px] font-bold text-paper"
+              >
+                Go
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             <p className="text-[14.5px] leading-relaxed text-paper-dim">
               A screenshot, a saved pic, anything with the look you want more
-              of. hapa reads the vibe — not who&apos;s in it.
+              of. hapa sends it to a server-side analysis service to read the
+              vibe — not who&apos;s in it.
             </p>
 
             <button
@@ -123,16 +165,18 @@ export function PhotoVibeOverlay({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      <div className="flex flex-col gap-3 px-7 pb-[calc(env(safe-area-inset-bottom)+40px)]">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!photo || reading}
-          className="w-full rounded-full bg-pine py-[17px] font-display text-base font-bold text-paper transition-opacity disabled:opacity-35"
-        >
-          {reading ? "Reading…" : "Update my feed"}
-        </button>
-      </div>
+      {!failed && (
+        <div className="flex flex-col gap-3 px-7 pb-[calc(env(safe-area-inset-bottom)+40px)]">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!photo || reading}
+            className="w-full rounded-full bg-pine py-[17px] font-display text-base font-bold text-paper transition-opacity disabled:opacity-35"
+          >
+            {reading ? "Reading…" : "Update my feed"}
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

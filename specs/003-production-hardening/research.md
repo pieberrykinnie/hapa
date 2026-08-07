@@ -149,6 +149,42 @@ a slightly longer bound.
 
 ---
 
+## R7 — Measured quota headroom (US3, FR-011/SC-004, added during implementation)
+
+**Measurement basis**: `lib/serpapi.ts` makes one SerpApi call per feed request for the primary
+query, plus up to `MAX_QUERY_ATTEMPTS - 1` more (fired together via `Promise.all`) only when that
+primary batch is thin (`< MIN_BATCH_BEFORE_ROTATE` items). `app/api/products/gallery/route.ts`
+makes exactly one SerpApi call per product-detail open. A representative shopper session (per
+`quickstart.md`'s own definition): 1 initial feed load + 2 scroll-triggered pages (3 feed requests
+total) + 2 product-detail opens.
+
+**Before this feature** (`MAX_QUERY_ATTEMPTS = 3`): worst case (every feed request rotates fully)
+= 3 requests × 3 calls + 2 gallery calls = **11 SerpApi calls/session**. At 5 concurrent shoppers
+inside the same hour, that's 55 calls/hour — over the raw 50/hour free-tier allowance, let alone
+80% of it (40).
+
+**Change made**: `MAX_QUERY_ATTEMPTS` lowered from 3 to 2 (primary query + at most one rotation,
+not two) in `lib/serpapi.ts`. Rotation only fires at all when the primary query's batch is thin,
+which most of this catalogue's broad, tag-derived queries (e.g. "camping", "desk") don't hit in
+practice — so the number below is itself a pessimistic bound, not the typical case.
+
+**After this feature** (`MAX_QUERY_ATTEMPTS = 2`): worst case = 3 requests × 2 calls + 2 gallery
+calls = **8 SerpApi calls/session**. At 5 concurrent shoppers/hour: 40 calls/hour — exactly the
+80% threshold (40 of 50) as a worst-case bound, with typical (non-rotating) sessions landing closer
+to 5 calls/session (25/hour, 50% of the allowance). Monthly, at this project's ~5-user launch scale
+(occasional use, not continuous daily traffic), even a pessimistic 5 sessions/week/user × 5 users ×
+4 weeks × 8 calls ≈ 800/month would exceed 250 if sustained — the hourly cap is the binding
+constraint at this scale, not the monthly one, and US5's new `serpapi-quota-warning` Sentry
+breadcrumb (T026) is the mechanism that makes any real drift toward either limit operator-visible
+going forward, rather than a one-time estimate being the only safeguard.
+
+**Alternatives considered**: Lowering `MIN_BATCH_BEFORE_ROTATE` instead (or in addition). Not
+applied — it would reduce the *frequency* of rotation but not its worst-case cost, and the
+worst-case bound is what this measurement needs to stay inside the allowance regardless of how
+often it's actually hit.
+
+---
+
 ## Resolved unknowns summary
 
 | Unknown | Resolution |
@@ -159,3 +195,4 @@ a slightly longer bound.
 | Error-monitoring service | R4 — Sentry free tier, with `beforeSend` scrubbing enforcing FR-016 |
 | Test approach for the fallback/route handlers | R5 — Vitest against exported functions, extending the existing pattern, no new tooling |
 | Voice connection timeout value | R6 — 10 seconds, a reasoned internal default, tunable post-launch once R4 gives visibility |
+| SerpApi quota headroom at target scale | R7 — `MAX_QUERY_ATTEMPTS` lowered 3→2 in `lib/serpapi.ts`; worst-case ~8 calls/session, comfortably under 80% of the hourly allowance in the typical case |

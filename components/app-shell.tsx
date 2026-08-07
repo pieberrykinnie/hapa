@@ -11,7 +11,6 @@ import { OnboardingBilling } from "./onboarding-billing";
 import { OnboardingIdentity } from "./onboarding-identity";
 import { PhotoVibeOverlay } from "./photo-vibe-overlay";
 import { ProductPage } from "./product-page";
-import { PurchaseFlow } from "./purchase-flow";
 import { TextVibeOverlay } from "./text-vibe-overlay";
 import { VoiceOverlay } from "./voice-overlay";
 
@@ -26,7 +25,7 @@ export function AppShell({ initialDNA, initialBilling }: { initialDNA: StyleDNA;
 }
 
 function Screens() {
-  const { screen, dna, order, requestPurchase } = useHapa();
+  const { screen, dna, visitListing } = useHapa();
   const [addVibeMode, setAddVibeMode] = useState<AddVibeMode | null>(null);
   const [opened, setOpened] = useState<{
     product: Product;
@@ -56,7 +55,7 @@ function Screens() {
     <>
       <Feed
         onOpenProduct={(product, layoutKey) => setOpened({ product, layoutKey })}
-        onBuy={requestPurchase}
+        onBuy={visitListing}
         onOpenAddVibe={setAddVibeMode}
       />
       <AnimatePresence>
@@ -66,7 +65,7 @@ function Screens() {
             product={opened.product}
             layoutKey={opened.layoutKey}
             onBack={() => setOpened(null)}
-            onBuy={() => requestPurchase(opened.product)}
+            onBuy={() => visitListing(opened.product)}
           />
         )}
         {addVibeMode === "speech" && (
@@ -78,7 +77,6 @@ function Screens() {
         {addVibeMode === "photo" && (
           <PhotoVibeOverlay key="photo" onClose={() => setAddVibeMode(null)} />
         )}
-        {order && <PurchaseFlow key="purchase" />}
       </AnimatePresence>
     </>
   );
