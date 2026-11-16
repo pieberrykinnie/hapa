@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { galleryFor } from "@/lib/gallery";
+import { isValidListingUrl } from "@/lib/listing-visits";
 import type { Product } from "@/lib/types";
 import { useHapa } from "./hapa-provider";
 import {
@@ -54,9 +55,11 @@ export function ProductPage({
   onBack: () => void;
   onBuy: () => void;
 }) {
-  const { toggleSaved, isSaved, purchaseFor } = useHapa();
+  const { toggleSaved, isSaved, visitFor } = useHapa();
   const saved = isSaved(product.id);
-  const purchased = purchaseFor(product.id);
+  const visit = visitFor(product.id);
+  const visited = (visit?.openedAt.length ?? 0) > 0;
+  const canBuy = isValidListingUrl(product.link);
   const price = formatPrice(product.price, product.currency);
   const discount = getDiscountLabel(product);
   const perk = getFulfillmentPerk(product.description);
@@ -231,21 +234,21 @@ export function ProductPage({
           </div>
         </div>
 
-        {purchased && (
+        {visited && (
           <div className="mt-4 flex items-center gap-3 rounded-frame border border-pine/15 bg-pine-tint px-3.5 py-3 text-pine">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pine text-paper">
               <CheckIcon size={18} />
             </span>
             <div className="min-w-0">
-              <p className="text-[13px] font-bold text-ink">Already bought</p>
+              <p className="text-[13px] font-bold text-ink">Listing opened</p>
               <p className="mt-0.5 truncate text-[11.5px] font-medium text-pine">
-                Shipping to you · {purchased.orderRef}
+                Opened at {visit?.merchant}
               </p>
             </div>
           </div>
         )}
 
-        {perk && !purchased && (
+        {perk && !visited && (
           <div className="mt-3 flex items-center gap-2 text-[13px] font-semibold text-pine">
             <DeliveryIcon size={16} />
             <span>{perk}</span>
@@ -281,12 +284,15 @@ export function ProductPage({
         <button
           type="button"
           onClick={onBuy}
-          className="w-full rounded-full bg-ink py-[16px] font-display text-[15px] font-bold text-paper shadow-[0_6px_18px_rgba(20,8,14,0.16)] active:scale-[0.99]"
+          disabled={!canBuy}
+          className="w-full rounded-full bg-ink py-[16px] font-display text-[15px] font-bold text-paper shadow-[0_6px_18px_rgba(20,8,14,0.16)] active:scale-[0.99] disabled:opacity-40"
         >
-          {purchased ? "Buy another" : "Buy now"} · {price}
+          {!canBuy
+            ? "Listing unavailable"
+            : `${visited ? "View listing again" : "Buy now"} · ${price}`}
         </button>
         <p className="mt-2.5 whitespace-nowrap text-center text-[10.5px] text-ink-faint">
-          HAPA prepares checkout. You confirm before payment.
+          Opens the merchant&apos;s real listing in a new tab.
         </p>
       </div>
     </motion.div>

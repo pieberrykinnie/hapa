@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { FALLBACK_FEED } from "./fallback-feed";
 import type { Product } from "./types";
 
@@ -16,7 +17,26 @@ const MAX_QUERY_LENGTH = 120;
 // instead of just returning less. Capped so one feed request can't chain
 // into a long, slow run of SerpApi calls.
 const MIN_BATCH_BEFORE_ROTATE = 4;
-const MAX_QUERY_ATTEMPTS = 3;
+// Capped at 2 (primary + at most one rotation) rather than 3 — see
+// research.md R7: at 3, a representative shopper session's worst-case
+// SerpApi consumption at this project's 5-shopper scale ran too close to
+// the free tier's 50/hour allowance to leave comfortable headroom (FR-011).
+const MAX_QUERY_ATTEMPTS = 2;
+
+// Instrumentation only (spec FR-011/FR-017) — does not change either
+// fetchLiveProducts's or fetchProductGallery's existing empty-array-on-
+// failure behavior. SerpApi returns quota exhaustion as a `data.error`
+// string rather than a distinct HTTP status, so the signal has to come
+// from that message's text.
+const QUOTA_ERROR_PATTERN = /run out|exceed|quota|out of searches|no more searches|limit reached/i;
+
+function reportSerpApiQuotaWarning(errorMessage: string, context: string) {
+  if (!QUOTA_ERROR_PATTERN.test(errorMessage)) return;
+  Sentry.captureMessage("serpapi-quota-warning", {
+    level: "warning",
+    extra: { context, error: errorMessage },
+  });
+}
 
 interface SerpApiShoppingResult {
   title?: string;
@@ -221,7 +241,10 @@ async function fetchLiveProducts(
     if (!res.ok) return [];
 
     const data = (await res.json()) as SerpApiShoppingResponse;
-    if (data.error) return [];
+    if (data.error) {
+      reportSerpApiQuotaWarning(data.error, "fetchLiveProducts");
+      return [];
+    }
 
     return normalize(data.shopping_results ?? [], query, exclude, seen);
   } catch {
@@ -310,7 +333,10 @@ export async function fetchProductGallery(pageToken: string): Promise<string[]> 
     if (!res.ok) return [];
 
     const data = (await res.json()) as SerpApiImmersiveProductResponse;
-    if (data.error) return [];
+    if (data.error) {
+      reportSerpApiQuotaWarning(data.error, "fetchProductGallery");
+      return [];
+    }
 
     const thumbnails = data.product_results?.thumbnails;
     return Array.isArray(thumbnails) ? thumbnails.filter((url) => typeof url === "string") : [];

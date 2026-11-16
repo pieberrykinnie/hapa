@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { galleryFor } from "@/lib/gallery";
+import { isValidListingUrl } from "@/lib/listing-visits";
 import { resetLocalOnboarding } from "@/lib/onboarding/local-store";
 import type { Product } from "@/lib/types";
 import { AddVibeRadial, type AddVibeMode } from "./add-vibe-radial";
@@ -375,8 +376,10 @@ function SavedCard({
   onOpen: () => void;
   onBuy: () => void;
 }) {
-  const { toggleSaved, purchaseFor } = useHapa();
-  const purchased = purchaseFor(product.id);
+  const { toggleSaved, visitFor } = useHapa();
+  const visit = visitFor(product.id);
+  const visited = (visit?.openedAt.length ?? 0) > 0;
+  const canBuy = isValidListingUrl(product.link);
   const discount = getDiscountLabel(product);
 
   return (
@@ -398,10 +401,10 @@ function SavedCard({
         >
           <BookmarkIcon size={17} filled color="#3f7d20" />
         </button>
-        {purchased && (
+        {visited && (
           <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-ink/88 px-2.5 py-1.5 text-[9.5px] font-bold text-paper backdrop-blur-sm">
             <CheckIcon size={12} />
-            Shipping
+            Opened at {visit?.merchant}
           </div>
         )}
       </motion.div>
@@ -428,9 +431,10 @@ function SavedCard({
         <button
           type="button"
           onClick={onBuy}
-          className="mt-3 w-full rounded-full bg-ink py-2.5 font-display text-[12px] font-bold text-paper"
+          disabled={!canBuy}
+          className="mt-3 w-full rounded-full bg-ink py-2.5 font-display text-[12px] font-bold text-paper disabled:opacity-40"
         >
-          {purchased ? "Buy another" : "Buy now"}
+          {!canBuy ? "Listing unavailable" : visited ? "View listing again" : "Buy now"}
         </button>
       </div>
     </article>
@@ -448,12 +452,14 @@ function FeedCard({
   onOpen: () => void;
   onBuy: () => void;
 }) {
-  const { toggleSaved, isSaved, purchaseFor } = useHapa();
+  const { toggleSaved, isSaved, visitFor } = useHapa();
   const slots = galleryFor(product);
   const railRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState(0);
   const saved = isSaved(product.id);
-  const purchased = purchaseFor(product.id);
+  const visit = visitFor(product.id);
+  const visited = (visit?.openedAt.length ?? 0) > 0;
+  const canBuy = isValidListingUrl(product.link);
   const discount = getDiscountLabel(product);
   const perk = getFulfillmentPerk(product.description);
   const description = getDisplayDescription(product.description, discount, perk);
@@ -561,15 +567,16 @@ function FeedCard({
           <button
             type="button"
             onClick={onBuy}
-            className="shrink-0 rounded-full bg-ink px-5 py-3 font-display text-sm font-bold text-paper shadow-[0_5px_16px_rgba(20,8,14,0.18)] transition-transform active:scale-[0.98]"
+            disabled={!canBuy}
+            className="shrink-0 rounded-full bg-ink px-5 py-3 font-display text-sm font-bold text-paper shadow-[0_5px_16px_rgba(20,8,14,0.18)] transition-transform active:scale-[0.98] disabled:opacity-40"
           >
-            {purchased ? "Buy another" : "Buy now"}
+            {!canBuy ? "Unavailable" : visited ? "View listing again" : "Buy now"}
           </button>
         </div>
-        {purchased ? (
+        {visited ? (
           <div className="mt-2 flex items-center gap-1.5 text-[12.5px] font-semibold text-pine">
             <CheckIcon size={15} />
-            <span>Bought · Shipping to you</span>
+            <span>Opened at {visit?.merchant}</span>
           </div>
         ) : perk ? (
           <div className="mt-2 flex items-center gap-1.5 text-[12.5px] font-semibold text-pine">

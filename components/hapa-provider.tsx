@@ -10,16 +10,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  STEP_MS,
-  buildSteps,
-  makeOrderRef,
-} from "@/lib/purchase-agent";
+import { isValidListingUrl, recordVisit } from "@/lib/listing-visits";
 import type {
   BillingMethod,
   BillingProvider,
   FeedResponse,
-  Order,
+  ListingVisit,
   Product,
   StyleDNA,
   VibeImage,
@@ -29,7 +25,7 @@ import type {
 const DNA_STORAGE_KEY = "hapa.dna";
 const BILLING_STORAGE_KEY = "hapa.billing";
 const SAVED_STORAGE_KEY = "hapa.saved";
-const PURCHASES_STORAGE_KEY = "hapa.purchases";
+const LISTING_VISITS_STORAGE_KEY = "hapa.listing-visits";
 
 const BILLING_LABELS: Record<BillingProvider, string> = {
   applepay: "Apple Pay",
@@ -40,11 +36,6 @@ const BILLING_LABELS: Record<BillingProvider, string> = {
 };
 
 export type Screen = "identity" | "swipe" | "billing" | "building" | "feed";
-
-export interface PurchaseRecord {
-  orderRef: string;
-  purchasedAt: string;
-}
 
 interface FetchFeedOpts {
   dna: StyleDNA;
@@ -61,8 +52,7 @@ interface HapaContextValue {
   vibeImages: VibeImage[];
   billing: BillingMethod | null;
   saved: Product[];
-  purchases: Record<string, PurchaseRecord>;
-  order: Order | null;
+  listingVisits: Record<string, ListingVisit>;
   items: Product[];
   activeCategory: string;
   status: "idle" | "loading" | "shifting";
@@ -77,13 +67,11 @@ interface HapaContextValue {
   setCategory: (category: string) => void;
   toggleSaved: (product: Product) => void;
   isSaved: (id: string) => boolean;
-  purchaseFor: (id: string) => PurchaseRecord | null;
+  visitFor: (id: string) => ListingVisit | null;
   loadMore: () => void;
   applyVibeShift: (shift: VibeShift) => void;
   dismissToast: () => void;
-  requestPurchase: (product: Product) => void;
-  confirmPurchase: () => void;
-  cancelPurchase: () => void;
+  visitListing: (product: Product) => void;
 }
 
 const HapaContext = createContext<HapaContextValue | null>(null);
@@ -132,8 +120,7 @@ export function HapaProvider({
   const [vibeImages, setVibeImages] = useState<VibeImage[]>([]);
   const [billing, setBilling] = useState<BillingMethod | null>(initialBilling ?? null);
   const [saved, setSaved] = useState<Product[]>([]);
-  const [purchases, setPurchases] = useState<Record<string, PurchaseRecord>>({});
-  const [order, setOrder] = useState<Order | null>(null);
+  const [listingVisits, setListingVisits] = useState<Record<string, ListingVisit>>({});
   const [items, setItems] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState("for-you");
   const [status, setStatus] = useState<"idle" | "loading" | "shifting">("idle");
@@ -145,8 +132,7 @@ export function HapaProvider({
   const cursorRef = useRef<number | null>(0);
   const fetchIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
-  const agentTimersRef = useRef<number[]>([]);
-  const activeOrderRef = useRef<Order | null>(null);
+  const retryTimersRef = useRef<number[]>([]);
   const itemsRef = useRef<Product[]>([]);
   // Every product ID shown so far in the current feed "lap" — sent back with
   // each request so neither live discovery nor the fallback loop repeats an
@@ -198,7 +184,7 @@ export function HapaProvider({
               fetchFeedRef.current({ ...opts, isRetry: true });
             }
           }, 1500);
-          agentTimersRef.current.push(retryTimer);
+          retryTimersRef.current.push(retryTimer);
           return;
         }
         if (opts.restoreOnFailure && opts.restoreOnFailure.length > 0) {
@@ -225,14 +211,14 @@ export function HapaProvider({
   // Saved product presentation state remains a local convenience.
   useEffect(() => {
     const storedSaved = loadJSON<Product[]>(SAVED_STORAGE_KEY);
-    const storedPurchases = loadJSON<Record<string, PurchaseRecord>>(
-      PURCHASES_STORAGE_KEY,
+    const storedVisits = loadJSON<Record<string, ListingVisit>>(
+      LISTING_VISITS_STORAGE_KEY,
     );
     /* Hydrating persisted state is exactly the "sync from an external system"
        case an effect is for — localStorage can't be read during SSR render. */
     /* eslint-disable react-hooks/set-state-in-effect */
     if (storedSaved) setSaved(storedSaved);
-    if (storedPurchases) setPurchases(storedPurchases);
+    if (storedVisits) setListingVisits(storedVisits);
     if (initialDNA) {
       setStatus("loading");
       fetchFeed({
@@ -248,7 +234,7 @@ export function HapaProvider({
   // object URLs are revoked on unmount so uploads don't leak
   useEffect(() => {
     return () => {
-      agentTimersRef.current.forEach((t) => window.clearTimeout(t));
+      retryTimersRef.current.forEach((t) => window.clearTimeout(t));
     };
   }, []);
 
@@ -430,95 +416,25 @@ export function HapaProvider({
 
   const dismissToast = useCallback(() => setToast(null), []);
 
-  /* ── agentic checkout ────────────────────────────────────────────────── */
+  /* ── listing hand-off ────────────────────────────────────────────────── */
 
-  // Buy now never pays directly — it opens a confirm step first, so a stray
-  // tap on a scrolling feed can't spend money.
-  const requestPurchase = useCallback((product: Product) => {
-    const next: Order = {
-      product,
-      stage: "confirm",
-      steps: [],
-      orderRef: null,
-      error: null,
-    };
-    activeOrderRef.current = next;
-    setOrder(next);
-  }, []);
-
-  const cancelPurchase = useCallback(() => {
-    agentTimersRef.current.forEach((t) => window.clearTimeout(t));
-    agentTimersRef.current = [];
-    activeOrderRef.current = null;
-    setOrder(null);
-  }, []);
-
-  const confirmPurchase = useCallback(() => {
-    setOrder((prev) => {
-      if (!prev || !billing) return prev;
-      const labels = buildSteps(prev.product, billing);
-
-      agentTimersRef.current.forEach((t) => window.clearTimeout(t));
-      agentTimersRef.current = labels.map((_, i) =>
-        window.setTimeout(
-          () => {
-            const active = activeOrderRef.current;
-            if (!active || active.stage !== "working") return;
-            const next: Order = {
-              ...active,
-              steps: active.steps.map((s, si) =>
-                si <= i ? { ...s, done: true } : s,
-              ),
-            };
-            activeOrderRef.current = next;
-            setOrder(next);
-          },
-          STEP_MS * (i + 1),
-        ),
-      );
-      agentTimersRef.current.push(
-        window.setTimeout(
-          () => {
-            const active = activeOrderRef.current;
-            if (!active || active.stage !== "working") return;
-            const orderRef = makeOrderRef();
-            const doneOrder: Order = {
-              ...active,
-              stage: "done",
-              orderRef,
-              steps: active.steps.map((step) => ({ ...step, done: true })),
-            };
-            activeOrderRef.current = doneOrder;
-            setOrder(doneOrder);
-            setPurchases((current) => {
-              const next = {
-                ...current,
-                [active.product.id]: {
-                  orderRef,
-                  purchasedAt: new Date().toISOString(),
-                },
-              };
-              saveJSON(PURCHASES_STORAGE_KEY, next);
-              return next;
-            });
-          },
-          STEP_MS * (labels.length + 0.6),
-        ),
-      );
-
-      const workingOrder: Order = {
-        ...prev,
-        stage: "working",
-        steps: labels.map((label) => ({ label, done: false })),
-      };
-      activeOrderRef.current = workingOrder;
-      return workingOrder;
+  // "Buy now" performs no server round trip of its own — it opens the
+  // product's real merchant listing directly and records that the shopper
+  // opened it. HAPA has no way to know whether a purchase actually happened
+  // on the merchant's site, and must not claim to.
+  const visitListing = useCallback((product: Product) => {
+    if (!isValidListingUrl(product.link)) return;
+    window.open(product.link, "_blank", "noopener,noreferrer");
+    setListingVisits((current) => {
+      const next = recordVisit(current, product);
+      saveJSON(LISTING_VISITS_STORAGE_KEY, next);
+      return next;
     });
-  }, [billing]);
+  }, []);
 
-  const purchaseFor = useCallback(
-    (id: string) => purchases[id] ?? null,
-    [purchases],
+  const visitFor = useCallback(
+    (id: string) => listingVisits[id] ?? null,
+    [listingVisits],
   );
 
   const value = useMemo<HapaContextValue>(
@@ -528,8 +444,7 @@ export function HapaProvider({
       vibeImages,
       billing,
       saved,
-      purchases,
-      order,
+      listingVisits,
       items,
       activeCategory,
       status,
@@ -544,13 +459,11 @@ export function HapaProvider({
       setCategory,
       toggleSaved,
       isSaved,
-      purchaseFor,
+      visitFor,
       loadMore,
       applyVibeShift,
       dismissToast,
-      requestPurchase,
-      confirmPurchase,
-      cancelPurchase,
+      visitListing,
     }),
     [
       screen,
@@ -558,8 +471,7 @@ export function HapaProvider({
       vibeImages,
       billing,
       saved,
-      purchases,
-      order,
+      listingVisits,
       items,
       activeCategory,
       status,
@@ -574,13 +486,11 @@ export function HapaProvider({
       setCategory,
       toggleSaved,
       isSaved,
-      purchaseFor,
+      visitFor,
       loadMore,
       applyVibeShift,
       dismissToast,
-      requestPurchase,
-      confirmPurchase,
-      cancelPurchase,
+      visitListing,
     ],
   );
 

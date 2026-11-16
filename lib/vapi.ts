@@ -40,6 +40,54 @@ export function stopVapiCall(): Promise<unknown> {
   return teardown;
 }
 
+/** Default bound for `raceConnectionOutcome` — research.md R6. */
+export const CONNECT_TIMEOUT_MS = 10000;
+
+type ConnectionOutcome = "call-start" | "call-end" | "error" | "timeout";
+
+/** The subset of Vapi's event-emitter interface a connection race needs. */
+interface ConnectionEventSource {
+  on(event: "call-start" | "call-end" | "error", listener: (...args: unknown[]) => void): unknown;
+  removeListener(
+    event: "call-start" | "call-end" | "error",
+    listener: (...args: unknown[]) => void,
+  ): unknown;
+}
+
+/**
+ * Bounds a voice connection attempt to `timeoutMs`: resolves with whichever
+ * of `call-start`/`call-end`/`error` fires first, or `"timeout"` if none do
+ * before the bound is reached — spec FR-013, so a stalled connection can
+ * never leave the shopper on an indefinite "connecting…" state.
+ */
+export function raceConnectionOutcome(
+  vapi: ConnectionEventSource,
+  timeoutMs: number = CONNECT_TIMEOUT_MS,
+): Promise<ConnectionOutcome> {
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const onCallStart = () => settle("call-start");
+    const onCallEnd = () => settle("call-end");
+    const onError = () => settle("error");
+    const timer = setTimeout(() => settle("timeout"), timeoutMs);
+
+    function settle(outcome: ConnectionOutcome) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      vapi.removeListener("call-start", onCallStart);
+      vapi.removeListener("call-end", onCallEnd);
+      vapi.removeListener("error", onError);
+      resolve(outcome);
+    }
+
+    vapi.on("call-start", onCallStart);
+    vapi.on("call-end", onCallEnd);
+    vapi.on("error", onError);
+  });
+}
+
 /**
  * Fully inline assistant — no Vapi dashboard assistant required, just the
  * public key. `voice.provider: "vapi"` uses Vapi's own hosted voices so no

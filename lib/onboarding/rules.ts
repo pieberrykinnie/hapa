@@ -10,7 +10,7 @@ import {
   MAX_PHOTO_BYTES,
 } from "./constants";
 
-const SENSITIVE_PATTERNS = [
+export const SENSITIVE_PATTERNS = [
   /\b(race|ethnicity|religion|disability|sexuality|pregnan(?:t|cy)|biometric(?:s)?)\b/i,
   /\b(gender identity|face recognition|medical condition|health condition)\b/i,
   /\b(person(?:'s)? age|years? old|identify (?:the )?person|person(?:'s)? name)\b/i,
